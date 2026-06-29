@@ -486,7 +486,7 @@
       "Ejecutar como: yo", "Acceso: cualquier persona")
      Debe terminar en /exec
      ═══════════════════════════════════════════════ */
-  const API = 'https://script.google.com/macros/s/AKfycbzeOS-kgew4EYfw3Sgv_Q0WnIpjtAmGAJQRfv1qPyJglkezL6D3wokRlbzHoTNB-mqLWw/exec';
+  const API = 'https://script.google.com/macros/s/AKfycbxuRRR6KtBGB3tZVhJMLmmfquv11OZNx_kCAvjvQbudIeaQU0oMnn9mrsq-7jFHMeRulQ/exec';
 
   /* ── Helpers de red ── */
   async function apiGet(action, params = {}) {
@@ -518,7 +518,6 @@
   /* ═══════════════════════════════════════════════
      TABS
      ═══════════════════════════════════════════════ */
-  let dashboardCargadoUnaVez = false;
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -738,6 +737,8 @@
       'Iniciada: ' + formatearFecha(lista.fechaCreacion) + (lista.numeroDocumento ? ' · Doc: ' + lista.numeroDocumento : '');
     itemsActuales = items || [];
     renderItems();
+    const pf = document.getElementById('preview-feedback'); if (pf) pf.textContent = '';
+    const sf = document.getElementById('scan-feedback'); if (sf) sf.textContent = '';
     document.getElementById('input-sku').focus();
   }
 
@@ -1003,3 +1004,4 @@
   </script>
 </body>
 </html>
+
