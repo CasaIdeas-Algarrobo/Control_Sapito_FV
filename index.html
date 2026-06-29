@@ -189,6 +189,12 @@
     .tipo-pill.entrada { background:var(--verde-bg); color:var(--verde); }
     .tipo-pill.salida { background:var(--rojo-bg); color:var(--rojo); }
     .row-delete { background:none; border:none; color:var(--rojo); font-weight:700; font-size:12px; cursor:pointer; font-family:var(--font); }
+    .chk { width:24px; height:24px; cursor:pointer; accent-color:var(--azul-600); -webkit-tap-highlight-color:transparent; }
+    .chk:disabled { cursor:not-allowed; opacity:0.4; }
+    .chk.verif { accent-color:var(--verde); }
+    td.chk-cell { text-align:center; }
+    .btn.locked { background:var(--amarillo-bg); color:var(--amarillo); border:2px solid transparent; }
+    .btn.unlocked { background:var(--verde-bg); color:var(--verde); border:2px solid transparent; }
     .nuevo-tag { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:9px; font-weight:800; background:var(--azul-100); color:var(--azul-700); letter-spacing:0.5px; }
     .table-footer { margin-top:10px; font-size:12px; color:var(--gris-500); font-weight:600; }
 
@@ -364,12 +370,15 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Stock</th><th></th></tr>
+                <tr><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Stock</th><th>Asist.</th><th>Verif.</th><th></th></tr>
               </thead>
               <tbody id="items-body"></tbody>
             </table>
           </div>
-          <div class="table-footer"><span id="items-count">0 productos</span></div>
+          <div class="table-footer" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span id="items-count">0 productos</span>
+            <button id="btn-modo-autorizador" class="btn ghost small" type="button">🔒 Verificación: bloqueada</button>
+          </div>
         </div>
       </div>
     </section>
@@ -462,6 +471,21 @@
     </div>
   </div>
 
+  <!-- MODAL DESBLOQUEO VERIFICACIÓN -->
+  <div id="modal-desbloqueo" class="modal hidden">
+    <div class="modal-content card">
+      <button class="modal-close" id="modal-desb-cerrar">&times;</button>
+      <h2 class="card-title">Desbloquear verificación</h2>
+      <p class="muted">Solo un autorizador puede marcar la casilla de verificación. Identifícate con tu PIN; quedará habilitada mientras uses esta lista.</p>
+      <div class="form-row" style="margin-top:14px;"><select id="select-desb-autorizador" style="flex:1;"></select></div>
+      <div class="form-row" style="margin-top:10px;">
+        <input id="input-desb-pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"/>
+        <button id="btn-confirmar-desb" class="btn primary" style="flex:1 1 140px;">Desbloquear</button>
+      </div>
+      <p id="desb-feedback" class="feedback"></p>
+    </div>
+  </div>
+
   <!-- MODAL DETALLE -->
   <div id="modal-detalle" class="modal hidden">
     <div class="modal-content card">
@@ -486,7 +510,7 @@
       "Ejecutar como: yo", "Acceso: cualquier persona")
      Debe terminar en /exec
      ═══════════════════════════════════════════════ */
-  const API = 'https://script.google.com/macros/s/AKfycbzgoUDg3hzZBqrhYJs8eRKdaRItdVx7NuiPcDukvU-ecUvYBjQMpWAEtQJWX91Djh4bXg/exec';
+  const API = 'https://script.google.com/macros/s/PEGA_AQUI_TU_NUEVA_URL/exec';
 
   /* ── Helpers de red ── */
   async function apiGet(action, params = {}) {
@@ -536,6 +560,8 @@
   let itemsActuales = [];
   let tipoSeleccionado = 'SALIDA';
   let modoScan = 'stock'; // 'stock' | 'lista'
+  let autorizadorDesbloqueado = false;
+  let sesionAutorizador = { nombre: '', pin: '' };
   let chartEstado = null, chartItems = null, chartMovimientos = null;
 
   /* ═══════════════════════════════════════════════
@@ -701,6 +727,9 @@
     selAut.innerHTML = '';
     (respAut.autorizadores || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; selAut.appendChild(o); });
 
+    const selDesb = document.getElementById('select-desb-autorizador');
+    if (selDesb) { selDesb.innerHTML = ''; (respAut.autorizadores || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; selDesb.appendChild(o); }); }
+
     if (listaActualId) {
       const det = await apiGet('listaDetalle', { id: listaActualId });
       if (det.success && det.lista.estado === 'Pendiente') mostrarPanelConLista(det.lista, det.items);
@@ -739,6 +768,7 @@
     renderItems();
     const pf = document.getElementById('preview-feedback'); if (pf) pf.textContent = '';
     const sf = document.getElementById('scan-feedback'); if (sf) sf.textContent = '';
+    bloquearAutorizador();
     document.getElementById('input-sku').focus();
   }
 
@@ -787,17 +817,99 @@
       const tr = document.createElement('tr');
       const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida';
       const nuevo = item.enInventario === false ? '<span class="nuevo-tag">NUEVO</span>' : '';
-      tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${item.stock}</td><td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
+      const chkA = item.checkAsistente ? 'checked' : '';
+      const chkV = item.checkAutorizador ? 'checked' : '';
+      const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
+      const disV = autorizadorDesbloqueado ? '' : 'disabled';
+      tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${item.stock}</td>`
+        + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
+        + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
+        + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
       body.appendChild(tr);
     });
     document.getElementById('items-count').textContent = itemsActuales.length + (itemsActuales.length === 1 ? ' producto' : ' productos');
     body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
+    body.querySelectorAll('.chk-asist').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'asistente', c.checked, c)));
+    body.querySelectorAll('.chk-verif').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'autorizador', c.checked, c)));
   }
 
   async function eliminarItem(itemIndex) {
     if (!confirm('¿Quitar este producto de la lista?')) return;
     const resp = await apiPost('eliminarItem', { listaId: listaActualId, itemIndex });
     if (resp.success) { itemsActuales.splice(itemIndex, 1); renderItems(); }
+  }
+
+  /* ── Casillas de verificación por producto ── */
+  async function marcarItem(itemIndex, quien, valor, checkEl) {
+    if (quien === 'autorizador' && !autorizadorDesbloqueado) {
+      if (checkEl) checkEl.checked = !valor;
+      abrirDesbloqueo();
+      return;
+    }
+    if (checkEl) checkEl.disabled = true;
+    const payload = { listaId: listaActualId, itemIndex, quien, valor };
+    if (quien === 'autorizador') { payload.autorizadoPor = sesionAutorizador.nombre; payload.pin = sesionAutorizador.pin; }
+    const resp = await apiPost('marcarItem', payload);
+    if (checkEl && quien === 'autorizador') checkEl.disabled = !autorizadorDesbloqueado;
+    else if (checkEl) checkEl.disabled = false;
+    if (!resp.success) {
+      if (checkEl) checkEl.checked = !valor;
+      alert(resp.message || 'No se pudo marcar');
+      return;
+    }
+    if (itemsActuales[itemIndex]) {
+      if (quien === 'asistente') itemsActuales[itemIndex].checkAsistente = valor ? 'SÍ' : '';
+      else itemsActuales[itemIndex].checkAutorizador = valor ? sesionAutorizador.nombre : '';
+    }
+    if (checkEl) checkEl.title = (quien === 'autorizador' && valor) ? ('Verificado por ' + sesionAutorizador.nombre) : checkEl.title;
+  }
+
+  /* ── Desbloqueo del modo autorizador (verificación) ── */
+  const modalDesbloqueo = document.getElementById('modal-desbloqueo');
+  const selectDesbAut = document.getElementById('select-desb-autorizador');
+  const inputDesbPin = document.getElementById('input-desb-pin');
+  const desbFeedback = document.getElementById('desb-feedback');
+  const btnModoAut = document.getElementById('btn-modo-autorizador');
+
+  btnModoAut.addEventListener('click', () => {
+    if (autorizadorDesbloqueado) { bloquearAutorizador(); return; }
+    abrirDesbloqueo();
+  });
+  function abrirDesbloqueo() {
+    inputDesbPin.value = ''; desbFeedback.textContent = '';
+    modalDesbloqueo.classList.remove('hidden'); inputDesbPin.focus();
+  }
+  document.getElementById('modal-desb-cerrar').addEventListener('click', () => modalDesbloqueo.classList.add('hidden'));
+  inputDesbPin.addEventListener('keydown', e => { if (e.key === 'Enter') confirmarDesbloqueo(); });
+  document.getElementById('btn-confirmar-desb').addEventListener('click', confirmarDesbloqueo);
+
+  async function confirmarDesbloqueo() {
+    const nombre = selectDesbAut.value;
+    const pin = inputDesbPin.value.trim();
+    if (!pin) { inputDesbPin.focus(); return; }
+    desbFeedback.textContent = 'Verificando...'; desbFeedback.className = 'feedback';
+    const resp = await apiPost('verificarPin', { autorizadoPor: nombre, pin });
+    if (!resp.success) { desbFeedback.textContent = resp.message || 'PIN incorrecto'; desbFeedback.className = 'feedback error'; inputDesbPin.value = ''; inputDesbPin.focus(); return; }
+    autorizadorDesbloqueado = true;
+    sesionAutorizador = { nombre, pin };
+    modalDesbloqueo.classList.add('hidden');
+    actualizarBotonModo();
+    renderItems();
+  }
+  function bloquearAutorizador() {
+    autorizadorDesbloqueado = false;
+    sesionAutorizador = { nombre: '', pin: '' };
+    actualizarBotonModo();
+    renderItems();
+  }
+  function actualizarBotonModo() {
+    if (autorizadorDesbloqueado) {
+      btnModoAut.textContent = '🔓 Verificación: ' + sesionAutorizador.nombre + ' (bloquear)';
+      btnModoAut.className = 'btn small unlocked';
+    } else {
+      btnModoAut.textContent = '🔒 Verificación: bloqueada';
+      btnModoAut.className = 'btn small locked';
+    }
   }
 
   /* ── Cierre con PIN ── */
@@ -1004,4 +1116,3 @@
   </script>
 </body>
 </html>
-
