@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sapito 3.0">
+  <meta name="theme-color" content="#0a0f1e">
+  <title>Control Sapito 3.0 – Algarrobo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --azul-900:#1e293b; --azul-800:#1e40af; --azul-700:#1d4ed8;
+      --azul-600:#2563eb; --azul-500:#2563eb; --azul-400:#3b82f6;
+      --azul-300:#93c5fd; --azul-100:#dbeafe; --azul-50:#eff6ff;
+      --cian:#2563eb; --blanco:#ffffff;
+      --gris-900:#111827; --gris-700:#374151; --gris-500:#6b7280;
+      --gris-200:#e5e7eb; --gris-100:#f3f4f6; --gris-50:#f9fafb;
+      --fondo:#f0f2f5;
+      --verde:#16a34a; --verde-bg:#dcfce7;
+      --amarillo:#d97706; --amarillo-bg:#fef3c7;
+      --rojo:#dc2626; --rojo-bg:#fee2e2;
+      --font:'Segoe UI', system-ui, -apple-system, sans-serif;
+      --radio:14px;
+      --sombra:0 4px 24px rgba(0,0,0,0.18);
+      --sombra-lg:0 8px 40px rgba(0,0,0,0.28);
+    }
+
+    html { height:100%; -webkit-text-size-adjust:100%; }
+    body {
+      font-family:var(--font); background:var(--fondo);
+      min-height:100vh; color:var(--gris-900);
+      display:flex; flex-direction:column;
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background:var(--blanco); box-shadow:0 1px 8px rgba(0,0,0,0.07);
+      position:sticky; top:0; z-index:50; border-bottom:1px solid var(--gris-200);
+    }
+    .header-inner { max-width:680px; margin:0 auto; padding:14px 20px; display:flex; align-items:center; gap:14px; }
+    .logo-wrap { flex-shrink:0; background:var(--gris-50); border:1px solid var(--gris-200); border-radius:10px; padding:7px 11px; }
+    .logo { height:36px; width:auto; object-fit:contain; display:block; }
+    .header-text { flex:1; min-width:0; }
+    .header-eyebrow { font-size:9px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--azul-500); margin-bottom:2px; }
+    .header-title { font-size:20px; font-weight:900; color:var(--gris-900); letter-spacing:-0.5px; line-height:1; }
+    .header-title .ver { color:var(--cian); font-size:22px; }
+    .header-loc { font-size:11px; color:var(--gris-500); margin-top:3px; font-weight:500; }
+
+    /* ── TAB BAR ── */
+    .tabbar { position:sticky; top:65px; z-index:49; background:var(--blanco); border-bottom:1px solid var(--gris-200); }
+    .tabbar-inner { max-width:680px; margin:0 auto; padding:0 12px; display:flex; gap:6px; }
+    .tab-btn {
+      flex:1; padding:13px 8px 12px; background:none; border:none;
+      border-bottom:3px solid transparent; cursor:pointer;
+      font-family:var(--font); font-size:13px; font-weight:700; color:var(--gris-500);
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      -webkit-tap-highlight-color:transparent; transition:color .15s, border-color .15s;
+    }
+    .tab-btn .ic { font-size:16px; }
+    .tab-btn.active { color:var(--azul-600); border-bottom-color:var(--azul-600); }
+
+    /* ── MAIN ── */
+    .main { flex:1; max-width:680px; width:100%; margin:0 auto; padding:18px 16px 48px; display:flex; flex-direction:column; gap:14px; }
+    .view { display:none; flex-direction:column; gap:14px; }
+    .view.active { display:flex; }
+
+    /* ── CARDS GENÉRICAS ── */
+    .card { background:var(--blanco); border-radius:var(--radio); padding:18px; box-shadow:var(--sombra); border:1px solid var(--gris-200); }
+    .eyebrow { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--azul-500); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .eyebrow::before { content:''; display:block; width:3px; height:14px; background:var(--azul-500); border-radius:2px; }
+    .muted { color:var(--gris-500); font-size:13px; line-height:1.5; }
+
+    /* ── SEARCH (STOCK) ── */
+    .search-row { display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
+    .input-wrap { flex:1 1 200px; position:relative; order:1; }
+    .input-icon { position:absolute; left:13px; top:50%; transform:translateY(-50%); font-size:15px; pointer-events:none; z-index:1; }
+    .search-input {
+      width:100%; padding:13px 13px 13px 40px; border:2px solid var(--gris-200); border-radius:11px;
+      font-size:16px; font-family:var(--font); color:var(--gris-900); background:var(--gris-50);
+      outline:none; -webkit-appearance:none; transition:border-color .2s, box-shadow .2s, background .2s;
+    }
+    .search-input:focus { border-color:var(--azul-400); background:var(--blanco); box-shadow:0 0 0 4px rgba(59,130,246,0.1); }
+    .search-input::placeholder { color:#9ca3af; }
+
+    .suggestions {
+      position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--blanco);
+      border:1.5px solid var(--azul-400); border-radius:11px; box-shadow:var(--sombra-lg);
+      z-index:200; max-height:280px; overflow-y:scroll; -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain; touch-action:pan-y;
+    }
+    .suggestions.hidden { display:none; }
+    .sugg-header-sticky { position:sticky; top:0; padding:7px 14px; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--gris-500); background:var(--gris-50); border-bottom:1px solid var(--gris-200); z-index:1; }
+    .suggestion-item { padding:12px 14px; cursor:pointer; border-bottom:1px solid var(--gris-100); min-height:52px; display:flex; flex-direction:column; justify-content:center; -webkit-tap-highlight-color:transparent; user-select:none; }
+    .suggestion-item:last-child { border-bottom:none; }
+    .suggestion-item.active, .suggestion-item:hover { background:var(--azul-50); }
+    .sugg-label { font-size:10px; color:var(--gris-500); font-family:monospace; }
+    .sugg-desc { font-size:13px; font-weight:600; color:var(--gris-900); margin-top:2px; line-height:1.3; }
+
+    /* ── BOTONES ── */
+    .btn-cam { order:2; flex-shrink:0; width:48px; height:48px; background:var(--gris-100); border:2px solid var(--gris-200); border-radius:11px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; transition:all .15s; }
+    .btn-cam:active { background:var(--azul-100); border-color:var(--azul-400); transform:scale(0.95); }
+    .btn {
+      padding:13px 20px; border:none; border-radius:11px; font-size:15px; font-weight:700;
+      cursor:pointer; font-family:var(--font); min-height:48px; -webkit-tap-highlight-color:transparent;
+      transition:all .15s; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;
+    }
+    .btn:active { transform:scale(0.97); opacity:0.92; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn.primary { background:linear-gradient(135deg, var(--azul-600), var(--azul-500)); color:var(--blanco); box-shadow:0 4px 14px rgba(29,78,216,0.35); }
+    .btn.ghost { background:var(--gris-100); color:var(--gris-700); border:2px solid var(--gris-200); }
+    .btn.danger-outline { background:var(--rojo-bg); color:var(--rojo); }
+    .btn.small { padding:8px 14px; font-size:13px; min-height:auto; }
+    .btn-consultar { order:3; flex:1 1 80px; }
+
+    /* ── RESULTADO STOCK ── */
+    .resultado { background:var(--blanco); border-radius:var(--radio); overflow:hidden; box-shadow:var(--sombra); border:1px solid var(--gris-200); animation:slideIn .25s ease; }
+    .resultado.hidden { display:none; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .res-header { background:linear-gradient(135deg, var(--azul-900), var(--azul-600)); padding:16px 20px; display:flex; align-items:center; gap:12px; }
+    .res-icon { width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .res-found-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--azul-300); }
+    .res-sku { font-size:17px; font-weight:900; color:var(--blanco); font-family:monospace; letter-spacing:0.5px; }
+    .res-body { padding:18px; }
+    .res-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .res-field { background:var(--gris-50); border:1.5px solid var(--gris-200); border-radius:11px; padding:14px; }
+    .res-field.span2 { grid-column:1 / -1; }
+    .res-field.desc-field { background:var(--fondo); border-color:var(--azul-100); }
+    .res-field-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gris-500); margin-bottom:6px; }
+    .res-field.desc-field .res-field-label { color:var(--azul-500); }
+    .res-field-value { font-size:14px; font-weight:600; color:var(--gris-900); line-height:1.4; }
+    .stock-num { font-size:52px; font-weight:900; line-height:1; letter-spacing:-2px; color:var(--gris-900); }
+    .stock-unit { font-size:12px; font-weight:600; color:var(--gris-500); margin-top:3px; text-transform:uppercase; letter-spacing:1px; }
+    .stock-badge { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-top:10px; }
+    .stock-badge::before { content:'●'; font-size:8px; }
+    .badge-ok { background:var(--verde-bg); color:var(--verde); }
+    .badge-low { background:var(--amarillo-bg); color:var(--amarillo); }
+    .badge-zero { background:var(--rojo-bg); color:var(--rojo); }
+    .badge-nodb { background:var(--azul-100); color:var(--azul-700); }
+    .res-error { padding:22px; display:flex; align-items:center; gap:14px; }
+    .error-icon { font-size:28px; flex-shrink:0; }
+    .error-title { font-size:15px; font-weight:700; color:var(--rojo); }
+    .error-msg { font-size:13px; color:var(--gris-500); margin-top:3px; }
+    .loading { padding:40px; text-align:center; }
+    .spinner { width:32px; height:32px; margin:0 auto 12px; border:3px solid var(--azul-100); border-top-color:var(--azul-500); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading p { font-size:14px; color:var(--gris-500); }
+    .empty-state { text-align:center; padding:52px 20px; color:var(--gris-500); }
+    .empty-icon { font-size:52px; margin-bottom:14px; opacity:0.6; }
+    .empty-text { font-size:15px; line-height:1.5; max-width:260px; margin:0 auto; }
+
+    /* ── FORMULARIOS LISTAS ── */
+    .form-row { display:flex; gap:8px; flex-wrap:wrap; align-items:stretch; }
+    .form-row > select, .form-row > input { flex:1 1 160px; }
+    select, input[type=text], input[type=number], input[type=password] {
+      padding:12px 13px; border:2px solid var(--gris-200); border-radius:11px; font-size:16px;
+      font-family:var(--font); color:var(--gris-900); background:var(--gris-50); outline:none; -webkit-appearance:none;
+    }
+    select:focus, input:focus { border-color:var(--azul-400); background:var(--blanco); box-shadow:0 0 0 4px rgba(59,130,246,0.1); }
+    h2.card-title { font-size:18px; font-weight:900; letter-spacing:-0.3px; margin-bottom:6px; }
+    h3.card-title { font-size:15px; font-weight:800; margin-bottom:12px; }
+
+    .lista-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+    .badge.pendiente { background:var(--amarillo-bg); color:var(--amarillo); }
+    .feedback { font-size:13px; margin-top:10px; min-height:18px; font-weight:600; }
+    .feedback.ok { color:var(--verde); }
+    .feedback.error { color:var(--rojo); }
+
+    .tipo-toggle { display:flex; gap:6px; flex:1 1 100%; }
+    .tipo-btn { flex:1; padding:11px; border:2px solid var(--gris-200); border-radius:11px; background:var(--gris-50); font-family:var(--font); font-size:14px; font-weight:700; cursor:pointer; color:var(--gris-500); -webkit-tap-highlight-color:transparent; }
+    .tipo-btn.salida.active { background:var(--rojo-bg); border-color:var(--rojo); color:var(--rojo); }
+    .tipo-btn.entrada.active { background:var(--verde-bg); border-color:var(--verde); color:var(--verde); }
+
+    /* ── TABLAS ── */
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; border:1px solid var(--gris-200); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { background:var(--gris-50); text-align:left; padding:10px 12px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--gris-500); border-bottom:1px solid var(--gris-200); white-space:nowrap; }
+    tbody td { padding:10px 12px; border-bottom:1px solid var(--gris-100); color:var(--gris-900); vertical-align:middle; }
+    tbody tr:last-child td { border-bottom:none; }
+    .tipo-pill { display:inline-block; padding:2px 9px; border-radius:14px; font-size:10px; font-weight:800; letter-spacing:0.5px; }
+    .tipo-pill.entrada { background:var(--verde-bg); color:var(--verde); }
+    .tipo-pill.salida { background:var(--rojo-bg); color:var(--rojo); }
+    .row-delete { background:none; border:none; color:var(--rojo); font-weight:700; font-size:12px; cursor:pointer; font-family:var(--font); }
+    .nuevo-tag { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:9px; font-weight:800; background:var(--azul-100); color:var(--azul-700); letter-spacing:0.5px; }
+    .table-footer { margin-top:10px; font-size:12px; color:var(--gris-500); font-weight:600; }
+
+    /* ── DASHBOARD ── */
+    .stats-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .stat-card { padding:16px; display:flex; flex-direction:column; gap:4px; }
+    .stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500); }
+    .stat-value { font-size:32px; font-weight:900; letter-spacing:-1px; color:var(--azul-700); }
+    .charts-grid { display:grid; grid-template-columns:1fr; gap:14px; }
+    .chart-card canvas { max-height:240px; }
+
+    .footer { text-align:center; padding:16px; font-size:11px; color:var(--gris-500); border-top:1px solid var(--gris-200); background:var(--blanco); padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+
+    /* ── MODALES ── */
+    .modal { position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:800; display:flex; align-items:center; justify-content:center; padding:18px; }
+    .modal.hidden { display:none; }
+    .modal-content { width:100%; max-width:440px; max-height:88vh; overflow-y:auto; position:relative; }
+    .modal-close { position:absolute; top:12px; right:14px; background:none; border:none; font-size:26px; line-height:1; color:var(--gris-500); cursor:pointer; }
+
+    /* ══ SCANNER ══ */
+    .scanner-overlay { position:fixed; inset:0; background:#000; z-index:999; display:flex; flex-direction:column; }
+    .scanner-overlay.hidden { display:none; }
+    .scanner-header { background:linear-gradient(135deg,#0f172a,#1e293b); padding:14px 20px; padding-top:calc(14px + env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; border-bottom:1px solid rgba(59,130,246,0.2); }
+    .scanner-title { font-size:15px; font-weight:800; color:var(--blanco); }
+    .scanner-sub { font-size:11px; color:var(--gris-500); margin-top:2px; }
+    .btn-cerrar-scan { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:var(--blanco); font-size:13px; font-weight:700; padding:7px 16px; border-radius:20px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .scanner-viewport { position:relative; flex:1; overflow:hidden; background:#000; }
+    #reader { width:100% !important; height:100% !important; border:none !important; }
+    #reader__dashboard_section_swaplink, #reader__dashboard_section_fileselection, #reader__filescan_input, #reader__scan_region img { display:none !important; }
+    #reader__scan_region { border:none !important; background:transparent !important; }
+    .scan-ui { position:absolute; inset:0; pointer-events:none; z-index:5; }
+    .s-dark-top { position:absolute; top:0; left:0; right:0; height:22%; background:rgba(0,0,0,0.6); }
+    .s-dark-bottom { position:absolute; bottom:0; left:0; right:0; height:28%; background:rgba(0,0,0,0.6); }
+    .s-dark-left { position:absolute; top:22%; bottom:28%; left:0; width:7%; background:rgba(0,0,0,0.6); }
+    .s-dark-right { position:absolute; top:22%; bottom:28%; right:0; width:7%; background:rgba(0,0,0,0.6); }
+    .s-window { position:absolute; top:22%; bottom:28%; left:7%; right:7%; }
+    .s-corner { position:absolute; width:24px; height:24px; border-color:var(--cian); border-style:solid; }
+    .s-corner.tl { top:0; left:0; border-width:3px 0 0 3px; border-radius:5px 0 0 0; }
+    .s-corner.tr { top:0; right:0; border-width:3px 3px 0 0; border-radius:0 5px 0 0; }
+    .s-corner.bl { bottom:0; left:0; border-width:0 0 3px 3px; border-radius:0 0 0 5px; }
+    .s-corner.br { bottom:0; right:0; border-width:0 3px 3px 0; border-radius:0 0 5px 0; }
+    .s-line { position:absolute; left:4px; right:4px; height:2px; background:linear-gradient(90deg, transparent, var(--cian), transparent); box-shadow:0 0 12px var(--cian); animation:scanMove 2s ease-in-out infinite; }
+    @keyframes scanMove { 0%{top:6px;opacity:0;} 10%{opacity:1;} 90%{opacity:1;} 100%{top:calc(100% - 6px);opacity:0;} }
+    .s-hint { position:absolute; bottom:29%; left:0; right:0; text-align:center; font-size:13px; color:rgba(255,255,255,0.7); padding:0 20px; text-shadow:0 1px 6px rgba(0,0,0,0.9); }
+    .scanner-status { background:#0f172a; padding:13px 20px; display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; min-height:58px; border-top:1px solid rgba(59,130,246,0.15); }
+    .scanner-status.success { background:linear-gradient(135deg,#064e3b,var(--verde)); }
+    .scan-status-text { font-size:14px; color:rgba(255,255,255,0.75); }
+    .scan-status-text strong { color:var(--blanco); display:block; font-size:15px; }
+    .scanner-manual { background:#0d1117; padding:10px 14px; padding-bottom:calc(10px + env(safe-area-inset-bottom)); display:flex; gap:8px; flex-shrink:0; border-top:1px solid #1e2d3d; }
+    .scan-manual-input { flex:1; padding:11px 14px; background:#161b22; border:1.5px solid #30363d; border-radius:9px; color:var(--blanco); font-size:16px; font-family:monospace; outline:none; -webkit-appearance:none; }
+    .scan-manual-input:focus { border-color:var(--cian); }
+    .scan-manual-input::placeholder { color:#484f58; }
+    .btn-scan-ok { padding:11px 16px; background:var(--azul-500); color:var(--blanco); border:none; border-radius:9px; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+    .btn-scan-ok:active { opacity:0.85; }
+    .scanner-cam-selector { background:#0d1117; padding:16px 20px; flex-shrink:0; border-bottom:1px solid #1e2d3d; }
+    .scanner-cam-selector.hidden { display:none; }
+    .scanner-cam-selector p { font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; }
+    .cam-lista { display:flex; flex-direction:column; gap:8px; }
+    .btn-camara { width:100%; padding:13px 16px; border-radius:10px; border:1px solid #30363d; background:#161b22; font-family:var(--font); font-size:14px; font-weight:600; color:rgba(255,255,255,0.85); cursor:pointer; text-align:left; transition:all .15s ease; -webkit-tap-highlight-color:transparent; }
+    .btn-camara:hover, .btn-camara:active { border-color:var(--azul-400); background:rgba(37,99,235,0.15); }
+    .btn-camara.activa { border-color:var(--verde); background:rgba(22,163,74,0.15); color:#4ade80; font-weight:700; }
+    .btn-cambiar-cam { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:var(--blanco); font-size:12px; font-weight:700; padding:6px 12px; border-radius:16px; cursor:pointer; white-space:nowrap; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+    .btn-cambiar-cam.hidden { display:none; }
+
+    @media (max-width:480px) {
+      .header-title { font-size:18px; } .header-title .ver { font-size:20px; }
+      .main { padding:14px 12px 36px; gap:12px; }
+      .card { padding:16px; }
+      .res-grid { grid-template-columns:1fr; } .res-field.span2 { grid-column:1; }
+      .stock-num { font-size:44px; } .suggestions { max-height:220px; }
+      .tabbar { top:64px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo-wrap">
+        <img src="https://www.casaideas.com.bo/static/media/logo.40b7cd09.png" alt="Casaideas" class="logo" onerror="this.style.display='none'"/>
+      </div>
+      <div class="header-text">
+        <div class="header-eyebrow">Sistema de Inventario</div>
+        <div class="header-title">Control Sapito <span class="ver">3.0</span></div>
+        <div class="header-loc">📍 Algarrobo</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TAB BAR -->
+  <nav class="tabbar">
+    <div class="tabbar-inner">
+      <button class="tab-btn active" data-tab="stock"><span class="ic">📦</span>Stock</button>
+      <button class="tab-btn" data-tab="listas"><span class="ic">📋</span>Listas</button>
+      <button class="tab-btn" data-tab="panel"><span class="ic">📊</span>Panel</button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ═══════════ VIEW: STOCK ═══════════ -->
+    <section id="view-stock" class="view active">
+      <div class="card">
+        <div class="eyebrow">Consultar stock</div>
+        <div class="search-row">
+          <div class="input-wrap">
+            <span class="input-icon">🔍</span>
+            <input type="text" id="skuInput" placeholder="SKU, código madre o descripción…" autocomplete="off" class="search-input"/>
+            <div id="suggestions" class="suggestions hidden"></div>
+          </div>
+          <button class="btn-cam" id="btnCamStock" title="Escanear código">📷</button>
+          <button class="btn primary btn-consultar" id="btnConsultar">Consultar</button>
+        </div>
+      </div>
+      <section id="resultado" class="resultado hidden"></section>
+      <div id="estadoVacio" class="empty-state">
+        <div class="empty-icon">📦</div>
+        <p class="empty-text">Ingresa o escanea un SKU, código madre o descripción para consultar el stock en bodega.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════ VIEW: LISTAS ═══════════ -->
+    <section id="view-listas" class="view">
+
+      <div id="panel-sin-lista" class="card">
+        <h2 class="card-title">Iniciar nueva lista</h2>
+        <p class="muted">Elige el responsable de esta lista antes de empezar a ingresar SKU's.</p>
+        <div class="form-row" style="margin-top:14px;">
+          <select id="select-responsable"></select>
+          <input id="input-documento" type="text" placeholder="N° Documento (opcional)"/>
+        </div>
+        <div class="form-row" style="margin-top:10px;">
+          <button id="btn-crear-lista" class="btn primary" style="flex:1;">Iniciar lista</button>
+        </div>
+      </div>
+
+      <div id="panel-con-lista" style="display:none; flex-direction:column; gap:14px;">
+        <div class="card lista-header">
+          <div>
+            <span class="badge pendiente">Pendiente</span>
+            <h2 class="card-title" id="lista-responsable-actual">—</h2>
+            <p class="muted" id="lista-fecha-actual">—</p>
+          </div>
+          <button id="btn-abrir-cierre" class="btn danger-outline small">Cerrar lista</button>
+        </div>
+
+        <div class="card">
+          <div class="eyebrow">Agregar producto</div>
+          <div class="search-row">
+            <div class="input-wrap">
+              <span class="input-icon">🔍</span>
+              <input id="input-sku" type="text" class="search-input" placeholder="Ingresa o escanea un SKU" autocomplete="off"/>
+            </div>
+            <button id="btn-cam-lista" class="btn-cam" title="Escanear">📷</button>
+            <button id="btn-buscar-sku" class="btn ghost btn-consultar" type="button">Buscar</button>
+          </div>
+          <p id="preview-feedback" class="feedback"></p>
+          <div class="form-row" style="margin-top:4px;">
+            <div class="tipo-toggle">
+              <button type="button" class="tipo-btn salida active" data-tipo="SALIDA">Salida</button>
+              <button type="button" class="tipo-btn entrada" data-tipo="ENTRADA">Entrada</button>
+            </div>
+          </div>
+          <div class="form-row" style="margin-top:8px;">
+            <input id="input-cantidad" type="number" min="1" value="1" placeholder="Cantidad"/>
+            <button id="btn-agregar-sku" class="btn primary" style="flex:1 1 120px;">Agregar</button>
+          </div>
+          <p id="scan-feedback" class="feedback"></p>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Stock</th><th></th></tr>
+              </thead>
+              <tbody id="items-body"></tbody>
+            </table>
+          </div>
+          <div class="table-footer"><span id="items-count">0 productos</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ VIEW: PANEL ═══════════ -->
+    <section id="view-panel" class="view">
+      <div class="stats-grid">
+        <div class="card stat-card"><span class="stat-label">Pendientes</span><span class="stat-value" id="stat-pendientes">0</span></div>
+        <div class="card stat-card"><span class="stat-label">Cerradas</span><span class="stat-value" id="stat-cerradas">0</span></div>
+        <div class="card stat-card"><span class="stat-label">Total listas</span><span class="stat-value" id="stat-total">0</span></div>
+        <div class="card stat-card"><span class="stat-label">SKU's registrados</span><span class="stat-value" id="stat-items">0</span></div>
+      </div>
+      <div class="charts-grid">
+        <div class="card chart-card"><h3 class="card-title">Estado de listas</h3><canvas id="chart-estado"></canvas></div>
+        <div class="card chart-card"><h3 class="card-title">Productos por responsable (top 8)</h3><canvas id="chart-items"></canvas></div>
+        <div class="card chart-card"><h3 class="card-title">Entradas vs Salidas (unidades)</h3><canvas id="chart-movimientos"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Listas pendientes</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Responsable</th><th>Creación</th><th>Productos</th><th></th></tr></thead>
+            <tbody id="pendientes-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Listas cerradas</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Responsable</th><th>Creación</th><th>Cierre</th><th>Productos</th><th></th></tr></thead>
+            <tbody id="cerradas-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">Control Sapito 3.0 &nbsp;·&nbsp; CasaIdeas Algarrobo</footer>
+
+  <!-- SCANNER OVERLAY -->
+  <div id="scannerOverlay" class="scanner-overlay hidden">
+    <div class="scanner-header">
+      <div>
+        <div class="scanner-title">📷 Escáner de código de barras</div>
+        <div class="scanner-sub">Control Sapito 3.0 · Algarrobo</div>
+      </div>
+      <button class="btn-cerrar-scan" id="btnCerrarScanner">✕ Cerrar</button>
+    </div>
+    <div class="scanner-cam-selector hidden" id="panelSelectorCam">
+      <p>Elige la cámara que quieres usar:</p>
+      <div class="cam-lista" id="listaCamaras"></div>
+    </div>
+    <div class="scanner-viewport">
+      <div id="reader"></div>
+      <div class="scan-ui">
+        <div class="s-dark-top"></div><div class="s-dark-bottom"></div>
+        <div class="s-dark-left"></div><div class="s-dark-right"></div>
+        <div class="s-window">
+          <span class="s-corner tl"></span><span class="s-corner tr"></span>
+          <span class="s-corner bl"></span><span class="s-corner br"></span>
+          <div class="s-line"></div>
+        </div>
+        <div class="s-hint">Centra el código de barras dentro del recuadro</div>
+      </div>
+    </div>
+    <div class="scanner-status" id="scannerStatus">
+      <span class="scan-status-text" id="scannerStatusText">Iniciando…</span>
+      <button class="btn-cambiar-cam hidden" id="btnCambiarCam">🔄 Cambiar cámara</button>
+    </div>
+    <div class="scanner-manual">
+      <input type="number" inputmode="numeric" class="scan-manual-input" id="scannerManualInput" placeholder="O escribe el SKU manualmente…"/>
+      <button class="btn-scan-ok" onclick="confirmarManualScanner()">✓ OK</button>
+    </div>
+  </div>
+
+  <!-- MODAL CIERRE -->
+  <div id="modal-cierre" class="modal hidden">
+    <div class="modal-content card">
+      <button class="modal-close" id="modal-cierre-cerrar">&times;</button>
+      <h2 class="card-title">Autorizar cierre de lista</h2>
+      <p class="muted">Los productos se registrarán en Movimientos recién al confirmar. Los SKU que no estén en el Consolidado se agregarán automáticamente.</p>
+      <div class="form-row" style="margin-top:14px;"><select id="select-autorizador" style="flex:1;"></select></div>
+      <div class="form-row" style="margin-top:10px;">
+        <input id="input-pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"/>
+        <button id="btn-confirmar-cierre" class="btn primary" style="flex:1 1 140px;">Confirmar y cerrar</button>
+      </div>
+      <p id="cierre-feedback" class="feedback"></p>
+    </div>
+  </div>
+
+  <!-- MODAL DETALLE -->
+  <div id="modal-detalle" class="modal hidden">
+    <div class="modal-content card">
+      <button class="modal-close" id="modal-cerrar">&times;</button>
+      <h2 class="card-title" id="modal-titulo">Detalle de lista</h2>
+      <p class="muted" id="modal-subtitulo"></p>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead><tr><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th></tr></thead>
+          <tbody id="modal-items-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  'use strict';
+
+  /* ═══════════════════════════════════════════════
+     CONFIG — PEGA AQUÍ LA URL DE TU WEB APP UNIFICADA
+     (Implementar > Nueva implementación > App web,
+      "Ejecutar como: yo", "Acceso: cualquier persona")
+     Debe terminar en /exec
+     ═══════════════════════════════════════════════ */
+  const API = 'https://script.google.com/macros/s/PEGA_AQUI_TU_NUEVA_URL/exec';
+
+  /* ── Helpers de red ── */
+  async function apiGet(action, params = {}) {
+    const url = new URL(API);
+    url.searchParams.set('action', action);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString());
+    return res.json();
+  }
+  async function apiPost(action, payload = {}) {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, ...payload })
+    });
+    return res.json();
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function formatearFecha(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-CL', { day:'2-digit', month:'short', year:'numeric' }) +
+      ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  /* ═══════════════════════════════════════════════
+     TABS
+     ═══════════════════════════════════════════════ */
+  let dashboardCargadoUnaVez = false;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'panel') cargarDashboard();
+      if (btn.dataset.tab === 'stock') setTimeout(() => document.getElementById('skuInput').focus(), 50);
+    });
+  });
+
+  /* ═══════════════════════════════════════════════
+     ESTADO GLOBAL
+     ═══════════════════════════════════════════════ */
+  let listaActualId = localStorage.getItem('sapito_listaActualId') || null;
+  let itemsActuales = [];
+  let tipoSeleccionado = 'SALIDA';
+  let modoScan = 'stock'; // 'stock' | 'lista'
+  let chartEstado = null, chartItems = null, chartMovimientos = null;
+
+  /* ═══════════════════════════════════════════════
+     CACHÉ LOCAL (autocompletado del stock)
+     ═══════════════════════════════════════════════ */
+  const Cache = { listo:false, items:[] };
+  async function cargarCache() {
+    try {
+      const datos = await apiGet('prefetch');
+      if (Array.isArray(datos) && datos.length) {
+        Cache.items = datos.map(d => ({ sku:d[0], desc:d[1], cod:d[2] }));
+        Cache.listo = true;
+      }
+    } catch (e) { /* cae al backend para sugerencias */ }
+  }
+  function cacheSugerirSku(pre) {
+    const res = [], seen = new Set();
+    for (const it of Cache.items) {
+      const s = it.sku || '';
+      if (s.startsWith(pre) && !seen.has(s)) { seen.add(s); res.push({ sku:s, desc:it.desc||'' }); if (res.length>=8) break; }
+    }
+    return res;
+  }
+  function cacheBuscarDesc(texto) {
+    const t = texto.trim().toUpperCase(), res = [];
+    for (const it of Cache.items) { if ((it.desc||'').toUpperCase().includes(t)) { res.push({sku:it.sku,desc:it.desc}); if (res.length>=8) break; } }
+    return res;
+  }
+  function cacheBuscarMadre(cod) {
+    const c = cod.trim().toUpperCase(), res = [];
+    for (const it of Cache.items) { if ((it.cod||'').toUpperCase() === c) { res.push({sku:it.sku,desc:it.desc,cod:it.cod}); if (res.length>=50) break; } }
+    return res;
+  }
+
+  /* ═══════════════════════════════════════════════
+     STOCK — autocompletar + buscar
+     ═══════════════════════════════════════════════ */
+  const inputEl = document.getElementById('skuInput');
+  const suggestEl = document.getElementById('suggestions');
+  const resultadoEl = document.getElementById('resultado');
+  const vacioEl = document.getElementById('estadoVacio');
+  let sugActiva = -1, timeoutSugg, tocandoDropdown = false;
+
+  suggestEl.addEventListener('touchstart', () => { tocandoDropdown = true; }, { passive:true });
+  suggestEl.addEventListener('touchend', () => { tocandoDropdown = false; }, { passive:true });
+  inputEl.addEventListener('blur', () => setTimeout(() => { if (!tocandoDropdown) cerrarSugerencias(); }, 200));
+  document.addEventListener('mousedown', e => { if (!e.target.closest('#view-stock .input-wrap')) cerrarSugerencias(); });
+
+  inputEl.addEventListener('keydown', e => {
+    const items = suggestEl.querySelectorAll('.suggestion-item');
+    if (e.key === 'ArrowDown') { e.preventDefault(); sugActiva = Math.min(sugActiva+1, items.length-1); items.forEach((el,i)=>el.classList.toggle('active', i===sugActiva)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sugActiva = Math.max(sugActiva-1,-1); items.forEach((el,i)=>el.classList.toggle('active', i===sugActiva)); }
+    else if (e.key === 'Enter') { const a = items[sugActiva]; if (a) { inputEl.value = a.dataset.sku; cerrarSugerencias(); } buscar(); }
+    else if (e.key === 'Escape') cerrarSugerencias();
+  });
+
+  inputEl.addEventListener('input', function() {
+    clearTimeout(timeoutSugg);
+    const val = this.value.trim();
+    if (val.length < 2) { cerrarSugerencias(); return; }
+    if (Cache.listo) {
+      const esNum = /^\d+$/.test(val);
+      if (esNum && val.length >= 5) { const m = cacheBuscarMadre(val); if (m.length) { mostrarSugDesc(m, true); return; } }
+      if (esNum) { const s = cacheSugerirSku(val); s.length ? mostrarSugSimple(s) : cerrarSugerencias(); }
+      else { const d = cacheBuscarDesc(val); d.length ? mostrarSugDesc(d, false) : cerrarSugerencias(); }
+      return;
+    }
+    timeoutSugg = setTimeout(async () => {
+      const esNum = /^\d+$/.test(val);
+      try {
+        if (esNum && val.length >= 5) {
+          const m = await apiGet('codigoMadre', { codigo: val });
+          if (m && m.length) { mostrarSugDesc(m, true); return; }
+          const s = await apiGet('sugerir', { prefijo: val });
+          s && s.length ? mostrarSugSimple(s.map(x=>({sku:x,desc:''}))) : cerrarSugerencias();
+        } else if (esNum) {
+          const s = await apiGet('sugerir', { prefijo: val });
+          s && s.length ? mostrarSugSimple(s.map(x=>({sku:x,desc:''}))) : cerrarSugerencias();
+        } else {
+          const d = await apiGet('descripcion', { texto: val });
+          d && d.length ? mostrarSugDesc(d, false) : cerrarSugerencias();
+        }
+      } catch (e) { cerrarSugerencias(); }
+    }, 300);
+  });
+
+  function mostrarSugSimple(lista) {
+    if (!lista || !lista.length) { cerrarSugerencias(); return; }
+    sugActiva = -1;
+    suggestEl.innerHTML = lista.map(s =>
+      `<div class="suggestion-item" data-sku="${esc(s.sku)}"><span class="sugg-desc">${esc(s.sku)}</span>${s.desc?`<span class="sugg-label">${esc(s.desc)}</span>`:''}</div>`
+    ).join('');
+    bindSug(); suggestEl.classList.remove('hidden');
+  }
+  function mostrarSugDesc(lista, esMadre) {
+    if (!lista || !lista.length) { cerrarSugerencias(); return; }
+    sugActiva = -1;
+    const header = esMadre ? `<div class="sugg-header-sticky">📦 ${lista.length} variante${lista.length>1?'s':''} encontrada${lista.length>1?'s':''}</div>` : '';
+    suggestEl.innerHTML = header + lista.map(s =>
+      `<div class="suggestion-item" data-sku="${esc(s.sku)}"><span class="sugg-label">${esc(s.sku)}</span><span class="sugg-desc">${esc(s.desc)}</span></div>`
+    ).join('');
+    bindSug(); suggestEl.classList.remove('hidden');
+  }
+  function bindSug() {
+    let startY = 0, scrolling = false;
+    suggestEl.addEventListener('touchstart', e => { startY = e.touches[0].clientY; scrolling = false; }, { passive:true });
+    suggestEl.addEventListener('touchmove', e => { if (Math.abs(e.touches[0].clientY - startY) > 5) scrolling = true; }, { passive:true });
+    suggestEl.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('mousedown', e => { e.preventDefault(); elegirSug(item.dataset.sku); });
+      item.addEventListener('touchend', e => { if (!scrolling) { e.preventDefault(); elegirSug(item.dataset.sku); } }, { passive:false });
+    });
+  }
+  function elegirSug(sku) { inputEl.value = sku; cerrarSugerencias(); buscar(); }
+  function cerrarSugerencias() { suggestEl.classList.add('hidden'); suggestEl.innerHTML = ''; sugActiva = -1; }
+
+  document.getElementById('btnConsultar').addEventListener('click', buscar);
+  async function buscar() {
+    const sku = inputEl.value.trim();
+    if (!sku) { inputEl.focus(); return; }
+    cerrarSugerencias();
+    vacioEl.style.display = 'none';
+    resultadoEl.classList.remove('hidden');
+    resultadoEl.innerHTML = `<div class="loading"><div class="spinner"></div><p>Consultando bodega…</p></div>`;
+    try {
+      const data = await apiGet('buscar', { sku });
+      mostrarResultado(data);
+    } catch (e) {
+      resultadoEl.innerHTML = `<div class="res-error"><div class="error-icon">⚠️</div><div><div class="error-title">Error de conexión</div><div class="error-msg">No se pudo conectar.</div></div></div>`;
+    }
+  }
+  function mostrarResultado(data) {
+    if (data && data.success) {
+      const stock = data.stock;
+      let badge;
+      if (data.enInventario === false) badge = `<span class="stock-badge badge-nodb">No está en inventario</span>`;
+      else if (stock === 0) badge = `<span class="stock-badge badge-zero">Sin stock</span>`;
+      else if (stock <= 5) badge = `<span class="stock-badge badge-low">Stock bajo</span>`;
+      else badge = `<span class="stock-badge badge-ok">Disponible</span>`;
+      resultadoEl.innerHTML = `
+        <div class="res-header"><div class="res-icon">📦</div><div><div class="res-found-label">Producto encontrado</div><div class="res-sku">${esc(data.sku)}</div></div></div>
+        <div class="res-body"><div class="res-grid">
+          <div class="res-field desc-field span2"><div class="res-field-label">Descripción</div><div class="res-field-value">${esc(data.desc) || '<em style="color:#9ca3af">Sin descripción</em>'}</div></div>
+          <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}</div>
+          <div class="res-field"><div class="res-field-label">SKU</div><div class="res-field-value" style="font-family:monospace;font-size:15px;word-break:break-all">${esc(String(data.sku))}</div></div>
+        </div></div>`;
+    } else {
+      resultadoEl.innerHTML = `<div class="res-error"><div class="error-icon">🔎</div><div><div class="error-title">No encontrado</div><div class="error-msg">${esc((data&&data.error)||'SKU no encontrado')}</div></div></div>`;
+    }
+    resultadoEl.classList.remove('hidden');
+  }
+
+  /* ═══════════════════════════════════════════════
+     LISTAS
+     ═══════════════════════════════════════════════ */
+  async function initListas() {
+    const resp = await apiGet('responsables');
+    const sel = document.getElementById('select-responsable');
+    sel.innerHTML = '';
+    (resp.responsables || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; sel.appendChild(o); });
+
+    const respAut = await apiGet('autorizadores');
+    const selAut = document.getElementById('select-autorizador');
+    selAut.innerHTML = '';
+    (respAut.autorizadores || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; selAut.appendChild(o); });
+
+    if (listaActualId) {
+      const det = await apiGet('listaDetalle', { id: listaActualId });
+      if (det.success && det.lista.estado === 'Pendiente') mostrarPanelConLista(det.lista, det.items);
+      else { localStorage.removeItem('sapito_listaActualId'); listaActualId = null; }
+    }
+  }
+
+  document.querySelectorAll('.tipo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      tipoSeleccionado = btn.dataset.tipo;
+    });
+  });
+
+  document.getElementById('btn-crear-lista').addEventListener('click', async () => {
+    const responsable = document.getElementById('select-responsable').value;
+    const numeroDocumento = document.getElementById('input-documento').value.trim();
+    const btn = document.getElementById('btn-crear-lista');
+    btn.disabled = true;
+    const resp = await apiPost('crearLista', { responsable, numeroDocumento });
+    btn.disabled = false;
+    if (!resp.success) { alert(resp.message || 'No se pudo crear la lista'); return; }
+    listaActualId = resp.id;
+    localStorage.setItem('sapito_listaActualId', listaActualId);
+    mostrarPanelConLista(resp, []);
+  });
+
+  function mostrarPanelConLista(lista, items) {
+    document.getElementById('panel-sin-lista').style.display = 'none';
+    document.getElementById('panel-con-lista').style.display = 'flex';
+    document.getElementById('lista-responsable-actual').textContent = lista.responsable;
+    document.getElementById('lista-fecha-actual').textContent =
+      'Iniciada: ' + formatearFecha(lista.fechaCreacion) + (lista.numeroDocumento ? ' · Doc: ' + lista.numeroDocumento : '');
+    itemsActuales = items || [];
+    renderItems();
+    document.getElementById('input-sku').focus();
+  }
+
+  const inputSku = document.getElementById('input-sku');
+  const inputCantidad = document.getElementById('input-cantidad');
+  const previewFeedback = document.getElementById('preview-feedback');
+  const scanFeedback = document.getElementById('scan-feedback');
+
+  inputSku.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); buscarPreviaSku(); } });
+  document.getElementById('btn-buscar-sku').addEventListener('click', buscarPreviaSku);
+
+  async function buscarPreviaSku() {
+    const sku = inputSku.value.trim();
+    if (!sku) return;
+    previewFeedback.textContent = 'Buscando...'; previewFeedback.className = 'feedback';
+    const resp = await apiGet('buscarSku', { sku });
+    if (!resp.success) { previewFeedback.textContent = resp.message || 'SKU no encontrado'; previewFeedback.className = 'feedback error'; inputSku.select(); return; }
+    const aviso = resp.enInventario === false ? ' · ⚠ no está en inventario, se agregará al consolidado al cerrar' : '';
+    previewFeedback.textContent = '✓ ' + resp.descripcion + ' (stock ref: ' + resp.stock + ')' + aviso;
+    previewFeedback.className = 'feedback ok';
+    inputCantidad.focus(); inputCantidad.select();
+  }
+
+  inputCantidad.addEventListener('keydown', e => { if (e.key === 'Enter') agregarSku(); });
+  document.getElementById('btn-agregar-sku').addEventListener('click', agregarSku);
+
+  async function agregarSku() {
+    const sku = inputSku.value.trim();
+    const cantidad = Number(inputCantidad.value);
+    if (!sku) { inputSku.focus(); return; }
+    if (!cantidad || cantidad <= 0) { inputCantidad.focus(); inputCantidad.select(); return; }
+    scanFeedback.textContent = 'Guardando...'; scanFeedback.className = 'feedback';
+    const resp = await apiPost('agregarItem', { listaId: listaActualId, sku, tipo: tipoSeleccionado, cantidad });
+    if (!resp.success) { scanFeedback.textContent = resp.message || 'No se pudo agregar'; scanFeedback.className = 'feedback error'; return; }
+    itemsActuales.push(resp.item);
+    renderItems();
+    scanFeedback.textContent = '✓ Agregado: ' + resp.item.descripcion + ' (se registra en Movimientos al cerrar)';
+    scanFeedback.className = 'feedback ok';
+    inputSku.value = ''; inputCantidad.value = '1'; previewFeedback.textContent = ''; inputSku.focus();
+  }
+
+  function renderItems() {
+    const body = document.getElementById('items-body');
+    body.innerHTML = '';
+    itemsActuales.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida';
+      const nuevo = item.enInventario === false ? '<span class="nuevo-tag">NUEVO</span>' : '';
+      tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${item.stock}</td><td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
+      body.appendChild(tr);
+    });
+    document.getElementById('items-count').textContent = itemsActuales.length + (itemsActuales.length === 1 ? ' producto' : ' productos');
+    body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
+  }
+
+  async function eliminarItem(itemIndex) {
+    if (!confirm('¿Quitar este producto de la lista?')) return;
+    const resp = await apiPost('eliminarItem', { listaId: listaActualId, itemIndex });
+    if (resp.success) { itemsActuales.splice(itemIndex, 1); renderItems(); }
+  }
+
+  /* ── Cierre con PIN ── */
+  const modalCierre = document.getElementById('modal-cierre');
+  const inputPin = document.getElementById('input-pin');
+  const cierreFeedback = document.getElementById('cierre-feedback');
+  document.getElementById('btn-abrir-cierre').addEventListener('click', () => { inputPin.value = ''; cierreFeedback.textContent = ''; modalCierre.classList.remove('hidden'); inputPin.focus(); });
+  document.getElementById('modal-cierre-cerrar').addEventListener('click', () => modalCierre.classList.add('hidden'));
+  inputPin.addEventListener('keydown', e => { if (e.key === 'Enter') confirmarCierre(); });
+  document.getElementById('btn-confirmar-cierre').addEventListener('click', confirmarCierre);
+
+  async function confirmarCierre() {
+    const autorizadoPor = document.getElementById('select-autorizador').value;
+    const pin = inputPin.value.trim();
+    if (!pin) { inputPin.focus(); return; }
+    cierreFeedback.textContent = 'Verificando...'; cierreFeedback.className = 'feedback';
+    const resp = await apiPost('cerrarLista', { listaId: listaActualId, autorizadoPor, pin });
+    if (!resp.success) { cierreFeedback.textContent = resp.message || 'No se pudo cerrar'; cierreFeedback.className = 'feedback error'; inputPin.value = ''; inputPin.focus(); return; }
+    modalCierre.classList.add('hidden');
+    const extra = resp.nuevosEnConsolidado ? ` · ${resp.nuevosEnConsolidado} SKU nuevo(s) agregado(s) al consolidado` : '';
+    localStorage.removeItem('sapito_listaActualId');
+    listaActualId = null; itemsActuales = [];
+    document.getElementById('panel-con-lista').style.display = 'none';
+    document.getElementById('panel-sin-lista').style.display = 'block';
+    document.getElementById('input-documento').value = '';
+    scanFeedback.textContent = ''; previewFeedback.textContent = '';
+    alert('Lista cerrada: ' + resp.itemsVolcados + ' movimiento(s) registrado(s)' + extra);
+  }
+
+  /* ═══════════════════════════════════════════════
+     PANEL / DASHBOARD
+     ═══════════════════════════════════════════════ */
+  async function cargarDashboard() {
+    const resp = await apiGet('listas');
+    if (!resp.success) return;
+    const { pendientes, cerradas } = resp;
+    document.getElementById('stat-pendientes').textContent = pendientes.length;
+    document.getElementById('stat-cerradas').textContent = cerradas.length;
+    document.getElementById('stat-total').textContent = pendientes.length + cerradas.length;
+    document.getElementById('stat-items').textContent = [...pendientes, ...cerradas].reduce((a,l)=>a+(l.totalItems||0),0);
+    renderTablaPendientes(pendientes);
+    renderTablaCerradas(cerradas);
+    renderChartEstado(pendientes.length, cerradas.length);
+    renderChartItems([...pendientes, ...cerradas]);
+    const r = await apiGet('resumenMovimientos');
+    if (r.success) renderChartMovimientos(r.totalEntrada, r.totalSalida);
+  }
+
+  function renderTablaPendientes(p) {
+    const body = document.getElementById('pendientes-body'); body.innerHTML = '';
+    if (!p.length) { body.innerHTML = '<tr><td colspan="4" class="muted">No hay listas pendientes</td></tr>'; return; }
+    p.forEach(l => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td><button class="btn small primary" data-id="${l.id}">Continuar</button></td>`; body.appendChild(tr); });
+    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => continuarLista(b.dataset.id)));
+  }
+  function renderTablaCerradas(c) {
+    const body = document.getElementById('cerradas-body'); body.innerHTML = '';
+    if (!c.length) { body.innerHTML = '<tr><td colspan="5" class="muted">No hay listas cerradas todavía</td></tr>'; return; }
+    c.forEach(l => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${formatearFecha(l.fechaCierre)}</td><td>${l.totalItems}</td><td><button class="btn small ghost" data-id="${l.id}">Ver</button></td>`; body.appendChild(tr); });
+    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => verDetalle(b.dataset.id)));
+  }
+
+  async function continuarLista(id) {
+    const det = await apiGet('listaDetalle', { id });
+    if (!det.success) return;
+    listaActualId = id; localStorage.setItem('sapito_listaActualId', id);
+    document.querySelector('.tab-btn[data-tab="listas"]').click();
+    mostrarPanelConLista(det.lista, det.items);
+  }
+  async function verDetalle(id) {
+    const det = await apiGet('listaDetalle', { id });
+    if (!det.success) return;
+    document.getElementById('modal-titulo').textContent = 'Lista de ' + det.lista.responsable;
+    document.getElementById('modal-subtitulo').textContent =
+      formatearFecha(det.lista.fechaCreacion) + ' → ' + formatearFecha(det.lista.fechaCierre) +
+      (det.lista.numeroDocumento ? ' · Doc: ' + det.lista.numeroDocumento : '') +
+      (det.lista.autorizadoPor ? ' · Autorizó: ' + det.lista.autorizadoPor : '');
+    const body = document.getElementById('modal-items-body'); body.innerHTML = '';
+    det.items.forEach(item => { const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida'; const tr = document.createElement('tr'); tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td>`; body.appendChild(tr); });
+    document.getElementById('modal-detalle').classList.remove('hidden');
+  }
+  document.getElementById('modal-cerrar').addEventListener('click', () => document.getElementById('modal-detalle').classList.add('hidden'));
+
+  function renderChartEstado(pend, cerr) {
+    const ctx = document.getElementById('chart-estado'); if (chartEstado) chartEstado.destroy();
+    chartEstado = new Chart(ctx, { type:'doughnut', data:{ labels:['Pendientes','Cerradas'], datasets:[{ data:[pend,cerr], backgroundColor:['#d97706','#16a34a'], borderWidth:0 }] }, options:{ plugins:{ legend:{ position:'bottom' } }, cutout:'65%' } });
+  }
+  function renderChartItems(listas) {
+    const top = [...listas].sort((a,b)=>b.totalItems-a.totalItems).slice(0,8);
+    const ctx = document.getElementById('chart-items'); if (chartItems) chartItems.destroy();
+    chartItems = new Chart(ctx, { type:'bar', data:{ labels:top.map(l=>l.responsable), datasets:[{ label:'Productos', data:top.map(l=>l.totalItems), backgroundColor:'#2563eb', borderRadius:6, maxBarThickness:34 }] }, options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
+  }
+  function renderChartMovimientos(ent, sal) {
+    const ctx = document.getElementById('chart-movimientos'); if (chartMovimientos) chartMovimientos.destroy();
+    chartMovimientos = new Chart(ctx, { type:'doughnut', data:{ labels:['Entradas','Salidas'], datasets:[{ data:[ent,sal], backgroundColor:['#16a34a','#dc2626'], borderWidth:0 }] }, options:{ plugins:{ legend:{ position:'bottom' } }, cutout:'65%' } });
+  }
+
+  /* ═══════════════════════════════════════════════
+     SCANNER (compartido, sensible al modo)
+     ═══════════════════════════════════════════════ */
+  const scannerStatusEl = document.getElementById('scannerStatus');
+  const scannerStatusTx = document.getElementById('scannerStatusText');
+  const panelSelectorCam = document.getElementById('panelSelectorCam');
+  const listaCamarasEl = document.getElementById('listaCamaras');
+  const btnCambiarCam = document.getElementById('btnCambiarCam');
+  let html5QrCode = null, scannerActivo = false, camarasDisponibles = [], camaraActualId = null;
+
+  document.getElementById('btnCamStock').addEventListener('click', () => { modoScan = 'stock'; abrirScanner(); });
+  document.getElementById('btn-cam-lista').addEventListener('click', () => { modoScan = 'lista'; abrirScanner(); });
+  document.getElementById('btnCerrarScanner').addEventListener('click', cerrarScanner);
+  btnCambiarCam.addEventListener('click', mostrarSelectorCamara);
+
+  async function abrirScanner() {
+    document.getElementById('scannerOverlay').classList.remove('hidden');
+    panelSelectorCam.classList.add('hidden'); btnCambiarCam.classList.add('hidden');
+    scannerStatusEl.className = 'scanner-status'; scannerStatusTx.textContent = 'Buscando cámaras disponibles…';
+    try { camarasDisponibles = await Html5Qrcode.getCameras(); }
+    catch (err) { scannerStatusTx.innerHTML = '<strong style="color:#fca5a5">Permiso de cámara denegado</strong> Actívalo en ajustes o usa el campo de abajo.'; return; }
+    if (!camarasDisponibles || !camarasDisponibles.length) { scannerStatusTx.textContent = 'No se encontró ninguna cámara.'; return; }
+    camarasDisponibles.length === 1 ? await iniciarCamara(camarasDisponibles[0].id) : mostrarSelectorCamara();
+  }
+  function mostrarSelectorCamara() {
+    if (scannerActivo) detenerCamaraActual();
+    listaCamarasEl.innerHTML = '';
+    camarasDisponibles.forEach(cam => {
+      const btn = document.createElement('button');
+      const label = cam.label || '';
+      let nombre = label;
+      if (!nombre || /facing back|environment/i.test(nombre)) nombre = '📷 Cámara trasera';
+      else if (/facing front|user/i.test(nombre)) nombre = '🤳 Cámara frontal';
+      else nombre = '📷 ' + (label.length > 42 ? label.substring(0,42) + '…' : label);
+      btn.className = 'btn-camara' + (cam.id === camaraActualId ? ' activa' : '');
+      btn.textContent = nombre + (cam.id === camaraActualId ? '  ✓ en uso' : '');
+      btn.type = 'button';
+      btn.addEventListener('click', () => iniciarCamara(cam.id));
+      listaCamarasEl.appendChild(btn);
+    });
+    panelSelectorCam.classList.remove('hidden');
+    document.getElementById('reader').innerHTML = '';
+    scannerStatusTx.textContent = 'Elige la cámara que quieres usar:'; scannerStatusEl.className = 'scanner-status';
+    btnCambiarCam.classList.add('hidden');
+  }
+  async function iniciarCamara(camaraId) {
+    panelSelectorCam.classList.add('hidden');
+    scannerStatusTx.textContent = 'Iniciando cámara…'; scannerStatusEl.className = 'scanner-status';
+    await detenerCamaraActual();
+    try {
+      html5QrCode = new Html5Qrcode('reader', {
+        formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.CODABAR ],
+        verbose: false
+      });
+      await html5QrCode.start(camaraId, { fps:12, qrbox:{ width:280, height:110 }, aspectRatio:1.5 }, onScanExitoso, () => {});
+      scannerActivo = true; camaraActualId = camaraId;
+      scannerStatusTx.textContent = 'Buscando código de barras…';
+      if (camarasDisponibles.length > 1) btnCambiarCam.classList.remove('hidden');
+    } catch (err) {
+      let m = 'No se pudo iniciar esta cámara.';
+      if (String(err).toLowerCase().includes('permission')) m = 'Permiso de cámara denegado. Actívalo en la configuración del navegador.';
+      scannerStatusTx.textContent = m;
+      if (camarasDisponibles.length > 1) setTimeout(mostrarSelectorCamara, 1500);
+    }
+  }
+  async function detenerCamaraActual() {
+    if (html5QrCode && scannerActivo) { try { await html5QrCode.stop(); } catch (_) {} html5QrCode = null; scannerActivo = false; }
+    document.getElementById('reader').innerHTML = '';
+  }
+  async function onScanExitoso(codigo) {
+    if (!scannerActivo) return;
+    if (navigator.vibrate) navigator.vibrate([100,50,100]);
+    scannerStatusEl.className = 'scanner-status success';
+    scannerStatusTx.innerHTML = `<strong>${esc(codigo)}</strong>¡Escaneado!`;
+    btnCambiarCam.classList.add('hidden');
+    setTimeout(async () => {
+      await cerrarScanner();
+      const cod = codigo.trim();
+      if (modoScan === 'lista') {
+        inputSku.value = cod;
+        buscarPreviaSku();
+      } else {
+        inputEl.value = cod;
+        buscar();
+      }
+    }, 800);
+  }
+  async function cerrarScanner() {
+    await detenerCamaraActual();
+    panelSelectorCam.classList.add('hidden'); btnCambiarCam.classList.add('hidden');
+    scannerStatusTx.textContent = '';
+    document.getElementById('scannerManualInput').value = '';
+    document.getElementById('scannerOverlay').classList.add('hidden');
+  }
+  function confirmarManualScanner() {
+    const val = document.getElementById('scannerManualInput').value.trim();
+    if (val) onScanExitoso(val);
+  }
+  window.confirmarManualScanner = confirmarManualScanner;
+  document.getElementById('scannerManualInput').addEventListener('keydown', e => { if (e.key === 'Enter') confirmarManualScanner(); });
+
+  /* ═══════════════════════════════════════════════
+     ARRANQUE
+     ═══════════════════════════════════════════════ */
+  cargarCache();
+  initListas();
+  inputEl.focus();
+  </script>
+</body>
+</html>
