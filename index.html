@@ -486,6 +486,32 @@
     </div>
   </div>
 
+  <!-- MODAL AJUSTE DE STOCK (autorizado) -->
+  <div id="modal-ajuste" class="modal hidden">
+    <div class="modal-content card">
+      <button class="modal-close" id="modal-ajuste-cerrar">&times;</button>
+      <h2 class="card-title">Corregir stock</h2>
+      <p class="muted">Corrige el stock real cuando hay una inconsistencia. Solo un autorizador puede hacerlo; queda ajustada la cantidad inicial del inventario.</p>
+      <div class="info-ajuste" style="margin-top:14px; background:var(--gris-50); border:1.5px solid var(--gris-200); border-radius:11px; padding:12px 14px;">
+        <div style="font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gris-500); margin-bottom:4px;">Producto</div>
+        <div id="ajuste-desc" style="font-size:14px; font-weight:600; line-height:1.3;">—</div>
+        <div style="font-size:12px; color:var(--gris-500); margin-top:6px;">SKU <span id="ajuste-sku" style="font-family:monospace;">—</span> · stock actual: <strong id="ajuste-actual">—</strong></div>
+      </div>
+      <div class="form-row" style="margin-top:12px;">
+        <div style="flex:1 1 100%;">
+          <div class="field-label" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500); margin-bottom:5px;">Stock real (nuevo)</div>
+          <input id="ajuste-nuevo" type="number" min="0" inputmode="numeric" placeholder="Cantidad real en bodega"/>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:10px;"><select id="ajuste-autorizador" style="flex:1;"></select></div>
+      <div class="form-row" style="margin-top:10px;">
+        <input id="ajuste-pin" type="password" inputmode="numeric" placeholder="PIN autorizador" autocomplete="off"/>
+        <button id="btn-confirmar-ajuste" class="btn primary" style="flex:1 1 140px;">Guardar corrección</button>
+      </div>
+      <p id="ajuste-feedback" class="feedback"></p>
+    </div>
+  </div>
+
   <!-- MODAL DETALLE -->
   <div id="modal-detalle" class="modal hidden">
     <div class="modal-content card">
@@ -510,7 +536,7 @@
       "Ejecutar como: yo", "Acceso: cualquier persona")
      Debe terminar en /exec
      ═══════════════════════════════════════════════ */
-  const API = 'https://script.google.com/macros/s/AKfycbwAInruu01I4v8jhIvVEp9dBFwtbAlZq5GBWg2T4Fhz0F2SOBAf8pZaOvI8B6L1sp7lVw/exec';
+  const API = 'https://script.google.com/macros/s/AKfycbw_XJYW0GPpNlrTFxFgJKeCiSXCDsyy2_70X2j9jrxMmfXaMg9wER5EGsKQvhiWwhgUuQ/exec';
 
   /* ── Helpers de red ── */
   async function apiGet(action, params = {}) {
@@ -704,13 +730,17 @@
         <div class="res-header"><div class="res-icon">📦</div><div><div class="res-found-label">Producto encontrado</div><div class="res-sku">${esc(data.sku)}</div></div></div>
         <div class="res-body"><div class="res-grid">
           <div class="res-field desc-field span2"><div class="res-field-label">Descripción</div><div class="res-field-value">${esc(data.desc) || '<em style="color:#9ca3af">Sin descripción</em>'}</div></div>
-          <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}</div>
+          <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}<div style="margin-top:12px;"><button class="btn ghost small" id="btn-ajustar-stock" data-sku="${esc(String(data.sku))}" data-desc="${esc(data.desc||'')}" data-stock="${Number(stock)}" type="button">✏️ Corregir stock</button></div></div>
           <div class="res-field"><div class="res-field-label">SKU</div><div class="res-field-value" style="font-family:monospace;font-size:15px;word-break:break-all">${esc(String(data.sku))}</div></div>
         </div></div>`;
     } else {
       resultadoEl.innerHTML = `<div class="res-error"><div class="error-icon">🔎</div><div><div class="error-title">No encontrado</div><div class="error-msg">${esc((data&&data.error)||'SKU no encontrado')}</div></div></div>`;
     }
     resultadoEl.classList.remove('hidden');
+    const btnAj = document.getElementById('btn-ajustar-stock');
+    if (btnAj) btnAj.addEventListener('click', () => {
+      abrirAjuste(btnAj.dataset.sku, btnAj.dataset.desc, Number(btnAj.dataset.stock), () => buscar());
+    });
   }
 
   /* ═══════════════════════════════════════════════
@@ -729,6 +759,9 @@
 
     const selDesb = document.getElementById('select-desb-autorizador');
     if (selDesb) { selDesb.innerHTML = ''; (respAut.autorizadores || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; selDesb.appendChild(o); }); }
+
+    const selAj = document.getElementById('ajuste-autorizador');
+    if (selAj) { selAj.innerHTML = ''; (respAut.autorizadores || []).forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; selAj.appendChild(o); }); }
 
     if (listaActualId) {
       const det = await apiGet('listaDetalle', { id: listaActualId });
@@ -787,8 +820,13 @@
     const resp = await apiGet('buscarSku', { sku });
     if (!resp.success) { previewFeedback.textContent = resp.message || 'SKU no encontrado'; previewFeedback.className = 'feedback error'; inputSku.select(); return; }
     const aviso = resp.enInventario === false ? ' · ⚠ no está en inventario, se agregará al consolidado al cerrar' : '';
-    previewFeedback.textContent = '✓ ' + resp.descripcion + ' (stock ref: ' + resp.stock + ')' + aviso;
+    previewFeedback.innerHTML = '✓ ' + esc(resp.descripcion) + ' (stock ref: ' + resp.stock + ')' + aviso
+      + ' <button type="button" id="btn-ajustar-lista" class="btn ghost small" style="margin-left:6px;padding:4px 10px;min-height:auto;font-size:12px;">✏️ Corregir stock</button>';
     previewFeedback.className = 'feedback ok';
+    const btnAj = document.getElementById('btn-ajustar-lista');
+    if (btnAj) btnAj.addEventListener('click', () => {
+      abrirAjuste(resp.sku, resp.descripcion, Number(resp.stock), () => buscarPreviaSku());
+    });
     inputCantidad.focus(); inputCantidad.select();
   }
 
@@ -910,6 +948,47 @@
       btnModoAut.textContent = '🔒 Verificación: bloqueada';
       btnModoAut.className = 'btn small locked';
     }
+  }
+
+  /* ── Ajuste de stock (autorizado) — compartido Stock + Listas ── */
+  const modalAjuste = document.getElementById('modal-ajuste');
+  const ajusteNuevo = document.getElementById('ajuste-nuevo');
+  const ajustePin = document.getElementById('ajuste-pin');
+  const ajusteFeedback = document.getElementById('ajuste-feedback');
+  let ajusteCtx = { sku:'', onDone:null };
+
+  function abrirAjuste(sku, desc, stockActual, onDone) {
+    ajusteCtx = { sku, onDone: onDone || null };
+    document.getElementById('ajuste-desc').textContent = desc || '(sin descripción)';
+    document.getElementById('ajuste-sku').textContent = sku;
+    document.getElementById('ajuste-actual').textContent = Number(stockActual).toLocaleString('es-CL') + ' u.';
+    ajusteNuevo.value = ''; ajustePin.value = ''; ajusteFeedback.textContent = '';
+    /* si ya hay un autorizador desbloqueado en esta lista, precargarlo */
+    if (autorizadorDesbloqueado && sesionAutorizador.nombre) {
+      document.getElementById('ajuste-autorizador').value = sesionAutorizador.nombre;
+      ajustePin.value = sesionAutorizador.pin;
+    }
+    modalAjuste.classList.remove('hidden');
+    ajusteNuevo.focus();
+  }
+  document.getElementById('modal-ajuste-cerrar').addEventListener('click', () => modalAjuste.classList.add('hidden'));
+  ajustePin.addEventListener('keydown', e => { if (e.key === 'Enter') confirmarAjuste(); });
+  ajusteNuevo.addEventListener('keydown', e => { if (e.key === 'Enter') ajustePin.focus(); });
+  document.getElementById('btn-confirmar-ajuste').addEventListener('click', confirmarAjuste);
+
+  async function confirmarAjuste() {
+    const nuevoStock = Number(ajusteNuevo.value);
+    const autorizadoPor = document.getElementById('ajuste-autorizador').value;
+    const pin = ajustePin.value.trim();
+    if (ajusteNuevo.value === '' || isNaN(nuevoStock) || nuevoStock < 0) { ajusteFeedback.textContent = 'Ingresa el stock real'; ajusteFeedback.className = 'feedback error'; ajusteNuevo.focus(); return; }
+    if (!pin) { ajusteFeedback.textContent = 'Ingresa el PIN del autorizador'; ajusteFeedback.className = 'feedback error'; ajustePin.focus(); return; }
+    ajusteFeedback.textContent = 'Guardando...'; ajusteFeedback.className = 'feedback';
+    const btn = document.getElementById('btn-confirmar-ajuste'); btn.disabled = true;
+    const resp = await apiPost('ajustarStock', { sku: ajusteCtx.sku, nuevoStock, autorizadoPor, pin });
+    btn.disabled = false;
+    if (!resp.success) { ajusteFeedback.textContent = resp.message || 'No se pudo ajustar'; ajusteFeedback.className = 'feedback error'; return; }
+    modalAjuste.classList.add('hidden');
+    if (typeof ajusteCtx.onDone === 'function') ajusteCtx.onDone();
   }
 
   /* ── Cierre con PIN ── */
@@ -1116,3 +1195,4 @@
   </script>
 </body>
 </html>
+
