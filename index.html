@@ -594,14 +594,38 @@
      CACHÉ LOCAL (autocompletado del stock)
      ═══════════════════════════════════════════════ */
   const Cache = { listo:false, items:[] };
-  async function cargarCache() {
+  const CACHE_KEY = 'sapito_bd_cache_v1';
+  const CACHE_MAX_MS = 12 * 60 * 60 * 1000; // refrescar cada 12 h
+
+  /* Carga desde localStorage al instante; refresca desde el servidor solo si hace falta */
+  function cargarCacheLocal() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return 0;
+      const obj = JSON.parse(raw);
+      if (obj && Array.isArray(obj.items) && obj.items.length) {
+        Cache.items = obj.items;
+        Cache.listo = true;
+        return obj.ts || 1;
+      }
+    } catch (e) {}
+    return 0;
+  }
+  async function refrescarCacheServidor() {
     try {
       const datos = await apiGet('prefetch');
       if (Array.isArray(datos) && datos.length) {
         Cache.items = datos.map(d => ({ sku:d[0], desc:d[1], cod:d[2] }));
         Cache.listo = true;
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: Cache.items })); } catch (e) {}
       }
-    } catch (e) { /* cae al backend para sugerencias */ }
+    } catch (e) { /* si no hay red, se sigue usando lo que haya en localStorage */ }
+  }
+  async function cargarCache() {
+    const ts = cargarCacheLocal();               // instantáneo, funciona offline
+    const vencido = !ts || (Date.now() - ts > CACHE_MAX_MS);
+    if (vencido) await refrescarCacheServidor();  // descarga completa solo si no hay o está viejo
+    else refrescarCacheServidor();                // hay caché fresca: refresca en segundo plano sin bloquear
   }
   function cacheSugerirSku(pre) {
     const res = [], seen = new Set();
@@ -1195,4 +1219,3 @@
   </script>
 </body>
 </html>
-
