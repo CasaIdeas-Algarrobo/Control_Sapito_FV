@@ -527,32 +527,124 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
   'use strict';
 
   /* ═══════════════════════════════════════════════
-     CONFIG — PEGA AQUÍ LA URL DE TU WEB APP UNIFICADA
-     (Implementar > Nueva implementación > App web,
-      "Ejecutar como: yo", "Acceso: cualquier persona")
-     Debe terminar en /exec
+     CONEXIÓN A SUPABASE
      ═══════════════════════════════════════════════ */
-  const API = 'https://script.google.com/macros/s/AKfycbw_XJYW0GPpNlrTFxFgJKeCiSXCDsyy2_70X2j9jrxMmfXaMg9wER5EGsKQvhiWwhgUuQ/exec';
+  const SUPABASE_URL = 'https://xfvgwbwzwqszzkmuxepv.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_IO8P8rQM-ec1d3h9_ADdhw_Da4DuimC';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  /* ── Helpers de red ── */
+  /* ── Despachador de LECTURAS (mantiene las respuestas que espera la UI) ── */
   async function apiGet(action, params = {}) {
-    const url = new URL(API);
-    url.searchParams.set('action', action);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetch(url.toString());
-    return res.json();
+    try {
+      switch (action) {
+        case 'prefetch': return []; // ya no cacheamos 200k; se busca en vivo con índices
+        case 'sugerir': {
+          const { data } = await sb.from('productos').select('sku').like('sku', (params.prefijo||'') + '%').limit(8);
+          return (data||[]).map(r => r.sku);
+        }
+        case 'descripcion': {
+          const t = (params.texto||'').trim();
+          const { data } = await sb.from('productos').select('sku,descripcion').ilike('descripcion', '%'+t+'%').limit(8);
+          return (data||[]).map(r => ({ sku:r.sku, desc:r.descripcion||'' }));
+        }
+        case 'codigoMadre': {
+          const { data } = await sb.from('productos').select('sku,descripcion').eq('codigo_madre', (params.codigo||'').trim()).limit(50);
+          return (data||[]).map(r => ({ sku:r.sku, desc:r.descripcion||'' }));
+        }
+        case 'buscar':
+        case 'buscarSku': {
+          const { data, error } = await sb.rpc('buscar_stock', { p_sku: (params.sku||'').toString().trim() });
+          if (error) return { success:false, error:error.message };
+          const row = Array.isArray(data) ? data[0] : data;
+          if (!row) return { success:false, error:'SKU "'+params.sku+'" no encontrado' };
+          return { success:true, sku:row.sku, desc:row.descripcion||'', descripcion:row.descripcion||'',
+                   categoria:'', stock:Number(row.stock)||0, enInventario:row.en_inventario };
+        }
+        case 'responsables': {
+          const { data } = await sb.from('responsables').select('nombre').eq('activo', true).order('nombre');
+          return { success:true, responsables:(data||[]).map(r=>r.nombre) };
+        }
+        case 'autorizadores': {
+          const { data } = await sb.rpc('lista_autorizadores');
+          return { success:true, autorizadores:(data||[]).map(r=>r.nombre) };
+        }
+        case 'listas': {
+          const { data } = await sb.from('listas').select('*, lista_items(count)').order('fecha_creacion', { ascending:false });
+          const pendientes=[], cerradas=[];
+          (data||[]).forEach(l => {
+            const o = { id:l.id, fechaCreacion:l.fecha_creacion, responsable:l.responsable, estado:l.estado,
+              fechaCierre:l.fecha_cierre, totalItems:(l.lista_items&&l.lista_items[0]&&l.lista_items[0].count)||0,
+              numeroDocumento:l.numero_documento||'', autorizadoPor:l.autorizado_por||'' };
+            (l.estado==='Cerrada'?cerradas:pendientes).push(o);
+          });
+          return { success:true, pendientes, cerradas };
+        }
+        case 'listaDetalle': {
+          const { data: ls } = await sb.from('listas').select('*').eq('id', params.id).single();
+          if (!ls) return { success:false, message:'Lista no encontrada' };
+          const { data: its } = await sb.from('lista_items').select('*').eq('lista_id', params.id).order('id');
+          const items = (its||[]).map(it => ({ id:it.id, sku:it.sku, descripcion:it.descripcion, categoria:it.categoria,
+            tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', enInventario:true }));
+          const lista = { id:ls.id, fechaCreacion:ls.fecha_creacion, responsable:ls.responsable, estado:ls.estado,
+            fechaCierre:ls.fecha_cierre, totalItems:items.length, numeroDocumento:ls.numero_documento||'', autorizadoPor:ls.autorizado_por||'' };
+          return { success:true, lista, items };
+        }
+        case 'resumenMovimientos': {
+          const { data } = await sb.rpc('resumen_movimientos');
+          return data || { success:true, totalEntrada:0, totalSalida:0 };
+        }
+        default: return { success:false, message:'Acción GET no reconocida: '+action };
+      }
+    } catch (e) { return { success:false, error:e.message, message:e.message }; }
   }
+
+  /* ── Despachador de ESCRITURAS ── */
   async function apiPost(action, payload = {}) {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, ...payload })
-    });
-    return res.json();
+    try {
+      switch (action) {
+        case 'crearLista': {
+          const { data, error } = await sb.from('listas').insert({ responsable:payload.responsable, numero_documento:payload.numeroDocumento||'' }).select().single();
+          if (error) return { success:false, message:error.message };
+          return { success:true, id:data.id, fechaCreacion:data.fecha_creacion, responsable:data.responsable, numeroDocumento:data.numero_documento||'', estado:data.estado };
+        }
+        case 'agregarItem': {
+          const { data, error } = await sb.rpc('agregar_item', { p_lista_id:payload.listaId, p_sku:payload.sku, p_tipo:payload.tipo, p_cantidad:payload.cantidad });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'eliminarItem': {
+          const { error } = await sb.from('lista_items').delete().eq('id', payload.itemId);
+          if (error) return { success:false, message:error.message };
+          return { success:true };
+        }
+        case 'marcarItem': {
+          const { data, error } = await sb.rpc('marcar_item', { p_item_id:payload.itemId, p_quien:payload.quien, p_valor:payload.valor, p_autorizado_por:payload.autorizadoPor||'', p_pin:payload.pin||'' });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'cerrarLista': {
+          const { data, error } = await sb.rpc('cerrar_lista', { p_lista_id:payload.listaId, p_autorizado_por:payload.autorizadoPor, p_pin:payload.pin });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'verificarPin': {
+          const { data, error } = await sb.rpc('verificar_pin', { p_autorizado_por:payload.autorizadoPor, p_pin:payload.pin });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'ajustarStock': {
+          const { data, error } = await sb.rpc('ajustar_stock', { p_sku:payload.sku, p_nuevo:payload.nuevoStock, p_autorizado_por:payload.autorizadoPor, p_pin:payload.pin });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        default: return { success:false, message:'Acción POST no reconocida: '+action };
+      }
+    } catch (e) { return { success:false, message:e.message }; }
   }
 
   function esc(s) {
@@ -593,40 +685,8 @@
   /* ═══════════════════════════════════════════════
      CACHÉ LOCAL (autocompletado del stock)
      ═══════════════════════════════════════════════ */
-  const Cache = { listo:false, items:[] };
-  const CACHE_KEY = 'sapito_bd_cache_v1';
-  const CACHE_MAX_MS = 12 * 60 * 60 * 1000; // refrescar cada 12 h
-
-  /* Carga desde localStorage al instante; refresca desde el servidor solo si hace falta */
-  function cargarCacheLocal() {
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return 0;
-      const obj = JSON.parse(raw);
-      if (obj && Array.isArray(obj.items) && obj.items.length) {
-        Cache.items = obj.items;
-        Cache.listo = true;
-        return obj.ts || 1;
-      }
-    } catch (e) {}
-    return 0;
-  }
-  async function refrescarCacheServidor() {
-    try {
-      const datos = await apiGet('prefetch');
-      if (Array.isArray(datos) && datos.length) {
-        Cache.items = datos.map(d => ({ sku:d[0], desc:d[1], cod:d[2] }));
-        Cache.listo = true;
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: Cache.items })); } catch (e) {}
-      }
-    } catch (e) { /* si no hay red, se sigue usando lo que haya en localStorage */ }
-  }
-  async function cargarCache() {
-    const ts = cargarCacheLocal();               // instantáneo, funciona offline
-    const vencido = !ts || (Date.now() - ts > CACHE_MAX_MS);
-    if (vencido) await refrescarCacheServidor();  // descarga completa solo si no hay o está viejo
-    else refrescarCacheServidor();                // hay caché fresca: refresca en segundo plano sin bloquear
-  }
+  const Cache = { listo:false, items:[] };  // sin caché local: la búsqueda va en vivo a Supabase (instantánea por índices)
+  async function cargarCache() { /* no-op: ya no descargamos los 200.000 productos al teléfono */ }
   function cacheSugerirSku(pre) {
     const res = [], seen = new Set();
     for (const it of Cache.items) {
@@ -897,7 +957,8 @@
 
   async function eliminarItem(itemIndex) {
     if (!confirm('¿Quitar este producto de la lista?')) return;
-    const resp = await apiPost('eliminarItem', { listaId: listaActualId, itemIndex });
+    const it = itemsActuales[itemIndex]; if (!it) return;
+    const resp = await apiPost('eliminarItem', { itemId: it.id });
     if (resp.success) { itemsActuales.splice(itemIndex, 1); renderItems(); }
   }
 
@@ -909,7 +970,9 @@
       return;
     }
     if (checkEl) checkEl.disabled = true;
-    const payload = { listaId: listaActualId, itemIndex, quien, valor };
+    const it = itemsActuales[itemIndex];
+    if (!it) { return; }
+    const payload = { itemId: it.id, quien, valor };
     if (quien === 'autorizador') { payload.autorizadoPor = sesionAutorizador.nombre; payload.pin = sesionAutorizador.pin; }
     const resp = await apiPost('marcarItem', payload);
     if (checkEl && quien === 'autorizador') checkEl.disabled = !autorizadorDesbloqueado;
