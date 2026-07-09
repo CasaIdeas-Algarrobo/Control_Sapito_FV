@@ -397,6 +397,17 @@
         <div class="card chart-card"><h3 class="card-title">Entradas vs Salidas (unidades)</h3><canvas id="chart-movimientos"></canvas></div>
       </div>
       <div class="card">
+        <h3 class="card-title">⚠️ Correcciones de stock pendientes</h3>
+        <p class="muted" style="margin-bottom:10px;">Diferencias reportadas por responsables de lista. Requieren aprobación de un autorizador (PIN) para aplicarse.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>SKU</th><th>Descripción</th><th>Actual</th><th>Propuesto</th><th>Reportó</th><th></th></tr></thead>
+            <tbody id="pendientes-ajuste-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
         <h3 class="card-title">Listas pendientes</h3>
         <div class="table-wrap">
           <table>
@@ -598,6 +609,11 @@
           const { data } = await sb.rpc('resumen_movimientos');
           return data || { success:true, totalEntrada:0, totalSalida:0 };
         }
+        case 'ajustesPendientes': {
+          const { data, error } = await sb.rpc('listar_ajustes_pendientes');
+          if (error) return { success:false, message:error.message };
+          return { success:true, pendientes:(data||[]).map(r => ({ id:r.id, fecha:r.fecha, sku:r.sku, descripcion:r.descripcion, stockActual:r.stock_actual, stockPropuesto:r.stock_propuesto, propuestoPor:r.propuesto_por })) };
+        }
         default: return { success:false, message:'Acción GET no reconocida: '+action };
       }
     } catch (e) { return { success:false, error:e.message, message:e.message }; }
@@ -639,6 +655,21 @@
         }
         case 'ajustarStock': {
           const { data, error } = await sb.rpc('ajustar_stock', { p_sku:payload.sku, p_nuevo:payload.nuevoStock, p_autorizado_por:payload.autorizadoPor, p_pin:payload.pin });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'editarCantidadItem': {
+          const { data, error } = await sb.rpc('editar_cantidad_item', { p_item_id:payload.itemId, p_cantidad:payload.cantidad });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'proponerAjuste': {
+          const { data, error } = await sb.rpc('proponer_ajuste', { p_sku:payload.sku, p_nuevo:payload.nuevoStock, p_propuesto_por:payload.propuestoPor, p_lista_id:payload.listaId||null });
+          if (error) return { success:false, message:error.message };
+          return data;
+        }
+        case 'resolverAjustePendiente': {
+          const { data, error } = await sb.rpc('resolver_ajuste_pendiente', { p_id:payload.id, p_aprobar:payload.aprobar, p_autorizado_por:payload.autorizadoPor, p_pin:payload.pin });
           if (error) return { success:false, message:error.message };
           return data;
         }
@@ -905,12 +936,15 @@
     if (!resp.success) { previewFeedback.textContent = resp.message || 'SKU no encontrado'; previewFeedback.className = 'feedback error'; inputSku.select(); return; }
     const aviso = resp.enInventario === false ? ' · ⚠ no está en inventario, se agregará al consolidado al cerrar' : '';
     previewFeedback.innerHTML = '✓ ' + esc(resp.descripcion) + ' (stock ref: ' + resp.stock + ')' + aviso
-      + ' <button type="button" id="btn-ajustar-lista" class="btn ghost small" style="margin-left:6px;padding:4px 10px;min-height:auto;font-size:12px;">✏️ Corregir stock</button>';
+      + ' <button type="button" id="btn-ajustar-lista" class="btn ghost small" style="margin-left:6px;padding:4px 10px;min-height:auto;font-size:12px;">✏️ Corregir stock (autorizador)</button>'
+      + ' <button type="button" id="btn-proponer-ajuste" class="btn ghost small" style="margin-left:6px;padding:4px 10px;min-height:auto;font-size:12px;">⚠️ Reportar diferencia</button>';
     previewFeedback.className = 'feedback ok';
     const btnAj = document.getElementById('btn-ajustar-lista');
     if (btnAj) btnAj.addEventListener('click', () => {
       abrirAjuste(resp.sku, resp.descripcion, Number(resp.stock), () => buscarPreviaSku());
     });
+    const btnProp = document.getElementById('btn-proponer-ajuste');
+    if (btnProp) btnProp.addEventListener('click', () => proponerAjusteDesdeLista(resp.sku, resp.descripcion, Number(resp.stock)));
     inputCantidad.focus(); inputCantidad.select();
   }
 
@@ -943,7 +977,7 @@
       const chkV = item.checkAutorizador ? 'checked' : '';
       const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
       const disV = autorizadorDesbloqueado ? '' : 'disabled';
-      tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${item.stock}</td>`
+      tr.innerHTML = `<td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
         + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
@@ -951,8 +985,21 @@
     });
     document.getElementById('items-count').textContent = itemsActuales.length + (itemsActuales.length === 1 ? ' producto' : ' productos');
     body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
+    body.querySelectorAll('.row-cant').forEach(b => b.addEventListener('click', () => editarCantidad(Number(b.dataset.idx))));
     body.querySelectorAll('.chk-asist').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'asistente', c.checked, c)));
     body.querySelectorAll('.chk-verif').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'autorizador', c.checked, c)));
+  }
+
+  async function editarCantidad(itemIndex) {
+    const it = itemsActuales[itemIndex]; if (!it) return;
+    const nueva = prompt('Nueva cantidad para "' + it.descripcion + '" (' + it.tipo + '):', it.cantidad);
+    if (nueva === null) return;
+    const n = Number(nueva);
+    if (!n || n <= 0) { alert('Ingresa una cantidad válida'); return; }
+    const resp = await apiPost('editarCantidadItem', { itemId: it.id, cantidad: n });
+    if (!resp.success) { alert(resp.message || 'No se pudo modificar la cantidad'); return; }
+    itemsActuales[itemIndex].cantidad = n;
+    renderItems();
   }
 
   async function eliminarItem(itemIndex) {
@@ -1044,8 +1091,7 @@
   const ajusteFeedback = document.getElementById('ajuste-feedback');
   let ajusteCtx = { sku:'', onDone:null };
 
-  function abrirAjuste(sku, desc, stockActual, onDone) {
-    ajusteCtx = { sku, onDone: onDone || null };
+  function abrirAjuste(sku, desc, stockActual, onDone) {    ajusteCtx = { sku, onDone: onDone || null };
     document.getElementById('ajuste-desc').textContent = desc || '(sin descripción)';
     document.getElementById('ajuste-sku').textContent = sku;
     document.getElementById('ajuste-actual').textContent = Number(stockActual).toLocaleString('es-CL') + ' u.';
@@ -1076,6 +1122,20 @@
     if (!resp.success) { ajusteFeedback.textContent = resp.message || 'No se pudo ajustar'; ajusteFeedback.className = 'feedback error'; return; }
     modalAjuste.classList.add('hidden');
     if (typeof ajusteCtx.onDone === 'function') ajusteCtx.onDone();
+  }
+
+  /* ── Reportar diferencia (responsable, sin PIN) — queda pendiente de aprobación ── */
+  async function proponerAjusteDesdeLista(sku, desc, stockActual) {
+    const nuevo = prompt('Stock real que ves en bodega para "' + desc + '" (actual: ' + stockActual + '):', stockActual);
+    if (nuevo === null) return;
+    const nuevoNum = Number(nuevo);
+    if (isNaN(nuevoNum) || nuevoNum < 0) { alert('Ingresa un número válido'); return; }
+    const responsable = document.getElementById('lista-responsable-actual').textContent || 'Responsable';
+    const resp = await apiPost('proponerAjuste', { sku, nuevoStock: nuevoNum, propuestoPor: responsable, listaId: listaActualId });
+    const fb = document.getElementById('preview-feedback');
+    if (!resp.success) { fb.textContent = resp.message || 'No se pudo enviar la propuesta'; fb.className = 'feedback error'; return; }
+    fb.textContent = '📩 ' + (resp.message || 'Propuesta enviada. Quedará pendiente hasta que un supervisor la apruebe.');
+    fb.className = 'feedback ok';
   }
 
   /* ── Cierre con PIN ── */
@@ -1122,6 +1182,36 @@
     renderChartItems([...pendientes, ...cerradas]);
     const r = await apiGet('resumenMovimientos');
     if (r.success) renderChartMovimientos(r.totalEntrada, r.totalSalida);
+    cargarAjustesPendientes();
+  }
+
+  async function cargarAjustesPendientes() {
+    const resp = await apiGet('ajustesPendientes');
+    const body = document.getElementById('pendientes-ajuste-body');
+    if (!resp.success) { body.innerHTML = '<tr><td colspan="7" class="muted">No se pudo cargar</td></tr>'; return; }
+    const lista = resp.pendientes || [];
+    if (!lista.length) { body.innerHTML = '<tr><td colspan="7" class="muted">No hay correcciones pendientes</td></tr>'; return; }
+    body.innerHTML = '';
+    lista.forEach(a => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${formatearFecha(a.fecha)}</td><td style="font-family:monospace">${esc(a.sku)}</td><td>${esc(a.descripcion)}</td>`
+        + `<td>${Number(a.stockActual).toLocaleString('es-CL')}</td><td><strong>${Number(a.stockPropuesto).toLocaleString('es-CL')}</strong></td>`
+        + `<td>${esc(a.propuestoPor)}</td>`
+        + `<td style="display:flex;gap:6px;"><button class="btn small primary" data-id="${a.id}" data-ap="1">Aprobar</button><button class="btn small danger-outline" data-id="${a.id}" data-ap="0">Rechazar</button></td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => resolverAjustePendiente(Number(b.dataset.id), b.dataset.ap === '1')));
+  }
+
+  async function resolverAjustePendiente(id, aprobar) {
+    const sel = document.getElementById('select-autorizador');
+    const autorizadoPor = (sel && sel.value) ? sel.value : prompt('Autorizador:');
+    if (!autorizadoPor) return;
+    const pin = prompt('PIN de ' + autorizadoPor + ':');
+    if (pin === null || !pin.trim()) return;
+    const resp = await apiPost('resolverAjustePendiente', { id, aprobar, autorizadoPor, pin: pin.trim() });
+    if (!resp.success) { alert(resp.message || 'No se pudo procesar'); return; }
+    cargarAjustesPendientes();
   }
 
   function renderTablaPendientes(p) {
