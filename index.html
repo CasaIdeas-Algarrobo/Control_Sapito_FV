@@ -118,6 +118,48 @@
     .btn.ghost { background:var(--gris-100); color:var(--gris-700); border:2px solid var(--gris-200); }
     .btn.danger-outline { background:var(--rojo-bg); color:var(--rojo); }
     .btn.small { padding:8px 14px; font-size:13px; min-height:auto; }
+    .sat-chip { display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px; padding:5px 9px; border-radius:9px; border:none; font-family:inherit; font-size:11px; font-weight:800; line-height:1.2; white-space:nowrap; text-align:left; }
+    .sat-chip small { font-size:9px; font-weight:600; opacity:.85; }
+    .sat-chip.ok { background:var(--verde-bg); color:var(--verde); }
+    .sat-chip.pend { background:var(--amarillo-bg); color:var(--amarillo); }
+    .sat-chip.prob { background:var(--rojo-bg); color:var(--rojo); }
+    .sat-chip.venc { background:var(--rojo); color:#fff; }
+    .sat-chip.no { background:var(--gris-100); color:var(--gris-500); }
+    button.sat-chip { cursor:pointer; }
+    /* ── SATEO ── */
+    #view-sateo .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+    #view-sateo .field-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500); }
+    #view-sateo select, #view-sateo input[type=text] { width:100%; padding:12px 13px; border:2px solid var(--gris-200); border-radius:11px; font-size:16px; font-family:inherit; color:var(--gris-900); background:var(--gris-50); outline:none; -webkit-appearance:none; }
+    #view-sateo select:focus, #view-sateo input[type=text]:focus { border-color:var(--azul-400); background:var(--blanco); }
+    #view-sateo #btn-cam-sateo { flex-shrink:0; min-height:48px; font-size:18px; }
+    .sat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .sat-estado { display:flex; gap:8px; }
+    .sat-estado button { flex:1; padding:11px 8px; border-radius:11px; border:2px solid var(--gris-200); background:var(--gris-50); font-family:inherit; font-size:14px; font-weight:700; color:var(--gris-700); cursor:pointer; }
+    .sat-estado button.on-ok { background:var(--verde-bg); border-color:var(--verde); color:var(--verde); }
+    .sat-estado button.on-prob { background:var(--rojo-bg); border-color:var(--rojo); color:var(--rojo); }
+    .sat-prev { display:flex; align-items:center; gap:12px; margin-top:10px; min-height:20px; }
+    .sat-filtros { display:flex; gap:6px; flex-wrap:wrap; }
+    .sat-filtros button { padding:7px 13px; border-radius:20px; border:1.5px solid var(--gris-200); background:var(--gris-50); font-family:inherit; font-size:12px; font-weight:700; color:var(--gris-700); cursor:pointer; }
+    .sat-filtros button.active { background:var(--azul-600); border-color:var(--azul-600); color:#fff; }
+    .sat-item { display:flex; gap:12px; align-items:flex-start; padding:12px; border:1.5px solid var(--gris-200); border-radius:12px; background:var(--blanco); }
+    .sat-item + .sat-item { margin-top:8px; }
+    .sat-item.vencido { border-color:var(--rojo); background:var(--rojo-bg); }
+    .sat-main { flex:1; min-width:0; }
+    .sat-desc { font-size:14px; font-weight:700; color:var(--gris-900); line-height:1.3; }
+    .sat-meta { font-size:12px; color:var(--gris-500); margin-top:3px; line-height:1.5; }
+    .sat-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+    .sat-tag { font-size:10px; font-weight:800; padding:3px 9px; border-radius:20px; letter-spacing:.3px; }
+    .sat-tag.ok { background:var(--verde-bg); color:var(--verde); }
+    .sat-tag.prob { background:var(--rojo-bg); color:var(--rojo); }
+    .sat-tag.venc { background:var(--rojo); color:#fff; }
+    .sat-tag.val { background:var(--azul-100); color:var(--azul-700); }
+    .sat-tag.pend { background:var(--amarillo-bg); color:var(--amarillo); }
+    .sat-obs { font-size:12px; color:var(--gris-700); margin-top:6px; font-style:italic; }
+    .sat-side { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+    .sat-dias { font-size:20px; font-weight:900; line-height:1; color:var(--gris-900); text-align:right; }
+    .sat-dias small { display:block; font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--gris-500); }
+    .sat-item.vencido .sat-dias { color:var(--rojo); }
+    @media (max-width:520px){ .sat-grid { grid-template-columns:1fr; } }
     .btn-consultar { order:3; flex:1 1 80px; }
 
     /* ── RESULTADO STOCK ── */
@@ -297,6 +339,7 @@
     <div class="tabbar-inner">
       <button class="tab-btn active" data-tab="stock"><span class="ic">📦</span>Stock</button>
       <button class="tab-btn" data-tab="listas"><span class="ic">📋</span>Listas</button>
+      <button class="tab-btn" data-tab="sateo"><span class="ic">🏷️</span>Sateo</button>
       <button class="tab-btn" data-tab="panel"><span class="ic">📊</span>Panel</button>
     </div>
   </nav>
@@ -377,7 +420,7 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Foto</th><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Stock</th><th>Asist.</th><th>Verif.</th><th></th></tr>
+                <tr><th>Foto</th><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Stock</th><th>Sateo</th><th>Asist.</th><th>Verif.</th><th></th></tr>
               </thead>
               <tbody id="items-body"></tbody>
             </table>
@@ -431,6 +474,55 @@
             <tbody id="cerradas-body"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ VIEW: SATEO ═══════════ -->
+    <section id="view-sateo" class="view">
+      <div class="card">
+        <div class="eyebrow">Registrar sateo</div>
+        <p class="muted" style="margin-bottom:12px;">Anota cada producto al que le pusiste el precio a mano. La fecha y la hora se guardan solas.</p>
+        <div class="sat-grid">
+          <div class="field"><span class="field-label">Quién sateó</span><select id="sat-asistente"></select></div>
+          <div class="field"><span class="field-label">SKU</span>
+            <div style="display:flex; gap:8px;">
+              <input type="text" inputmode="numeric" id="sat-sku" placeholder="Escanea o escribe" autocomplete="off" style="flex:1; min-width:0;"/>
+              <button type="button" class="btn ghost small" id="btn-cam-sateo" title="Escanear">📷</button>
+            </div>
+          </div>
+        </div>
+        <div class="sat-prev" id="sat-prev"></div>
+        <div class="field" style="margin-top:12px;"><span class="field-label">Estado</span>
+          <div class="sat-estado">
+            <button type="button" id="sat-ok" class="on-ok">✓ OK</button>
+            <button type="button" id="sat-prob">⚠ Con problema</button>
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;"><span class="field-label">Observación (opcional)</span><input type="text" id="sat-obs" placeholder="Ej. faltan etiquetas, precio no coincide…" autocomplete="off"/></div>
+        <button class="btn primary" id="btn-sat-registrar" style="width:100%; margin-top:14px;">Registrar sateo</button>
+        <p class="feedback" id="sat-feedback"></p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat-card"><span class="stat-label">Sateados</span><span class="stat-value" id="sat-st-total">0</span></div>
+        <div class="card stat-card"><span class="stat-label">Por validar</span><span class="stat-value" id="sat-st-pend">0</span></div>
+        <div class="card stat-card"><span class="stat-label">Más de 30 días</span><span class="stat-value" id="sat-st-venc" style="color:var(--rojo);">0</span></div>
+        <div class="card stat-card"><span class="stat-label">Con problema</span><span class="stat-value" id="sat-st-prob">0</span></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+          <h3 class="card-title" style="margin:0;">Productos sateados</h3>
+          <button id="btn-sat-modo" class="btn small locked" type="button">🔒 Validar: bloqueado</button>
+        </div>
+        <div class="sat-filtros" id="sat-filtros">
+          <button data-f="todos" class="active">Todos</button>
+          <button data-f="pend">Por validar</button>
+          <button data-f="venc">Más de 30 días</button>
+          <button data-f="prob">Con problema</button>
+        </div>
+        <input type="text" id="sat-buscar" placeholder="Buscar SKU o descripción…" autocomplete="off" style="margin-top:10px;"/>
+        <div id="sat-lista" style="margin-top:12px;"></div>
       </div>
     </section>
 
@@ -543,7 +635,7 @@
       <p class="muted" id="modal-subtitulo"></p>
       <div class="table-wrap" style="margin-top:12px;">
         <table>
-          <thead><tr><th>Foto</th><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th></tr></thead>
+          <thead><tr><th>Foto</th><th>SKU</th><th>Descripción</th><th>Tipo</th><th>Cant.</th><th>Sateo</th></tr></thead>
           <tbody id="modal-items-body"></tbody>
         </table>
       </div>
@@ -710,6 +802,7 @@
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'panel') cargarDashboard();
+      if (btn.dataset.tab === 'sateo') cargarSateo();
       if (btn.dataset.tab === 'stock') setTimeout(() => document.getElementById('skuInput').focus(), 50);
     });
   });
@@ -720,7 +813,7 @@
   let listaActualId = localStorage.getItem('sapito_listaActualId') || null;
   let itemsActuales = [];
   let tipoSeleccionado = 'SALIDA';
-  let modoScan = 'stock'; // 'stock' | 'lista'
+  let modoScan = 'stock'; // 'stock' | 'lista' | 'sateo'
   let autorizadorDesbloqueado = false;
   let sesionAutorizador = { nombre: '', pin: '' };
   let chartEstado = null, chartItems = null, chartMovimientos = null;
@@ -1008,7 +1101,7 @@
       const chkV = item.checkAutorizador ? 'checked' : '';
       const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
       const disV = autorizadorDesbloqueado ? '' : 'disabled';
-      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td>`
+      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td>${sateoCelda(item.sku, true)}</td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
         + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
@@ -1017,6 +1110,7 @@
     document.getElementById('items-count').textContent = itemsActuales.length + (itemsActuales.length === 1 ? ' producto' : ' productos');
     body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
     body.querySelectorAll('.row-cant').forEach(b => b.addEventListener('click', () => editarCantidad(Number(b.dataset.idx))));
+    body.querySelectorAll('.row-sateo').forEach(b => b.addEventListener('click', () => irASatear(b.dataset.sku)));
     body.querySelectorAll('.chk-asist').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'asistente', c.checked, c)));
     body.querySelectorAll('.chk-verif').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'autorizador', c.checked, c)));
   }
@@ -1106,6 +1200,7 @@
     renderItems();
   }
   function actualizarBotonModo() {
+    actualizarBotonSateo();
     if (autorizadorDesbloqueado) {
       btnModoAut.textContent = '🔓 Verificación: ' + sesionAutorizador.nombre + ' (bloquear)';
       btnModoAut.className = 'btn small unlocked';
@@ -1274,7 +1369,7 @@
       (det.lista.numeroDocumento ? ' · Doc: ' + det.lista.numeroDocumento : '') +
       (det.lista.autorizadoPor ? ' · Autorizó: ' + det.lista.autorizadoPor : '');
     const body = document.getElementById('modal-items-body'); body.innerHTML = '';
-    det.items.forEach(item => { const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td>`; body.appendChild(tr); });
+    det.items.forEach(item => { const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${sateoCelda(item.sku, false)}</td>`; body.appendChild(tr); });
     document.getElementById('modal-detalle').classList.remove('hidden');
   }
   document.getElementById('modal-cerrar').addEventListener('click', () => document.getElementById('modal-detalle').classList.add('hidden'));
@@ -1374,6 +1469,9 @@
       if (modoScan === 'lista') {
         inputSku.value = cod;
         buscarPreviaSku();
+      } else if (modoScan === 'sateo') {
+        document.getElementById('sat-sku').value = cod;
+        previaSateo();
       } else {
         inputEl.value = cod;
         buscar();
@@ -1397,9 +1495,164 @@
   /* ═══════════════════════════════════════════════
      ARRANQUE
      ═══════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════
+     SATEO (precio puesto a mano)
+     ═══════════════════════════════════════════════ */
+  const SATEO_DIAS = 30;
+  let SATEOS = [], filtroSateo = 'todos', estadoSateo = 'ok';
+  const satSku = document.getElementById('sat-sku');
+  const satPrev = document.getElementById('sat-prev');
+  const satFb = document.getElementById('sat-feedback');
+  const btnSatModo = document.getElementById('btn-sat-modo');
+
+  async function initSateo() {
+    const r = await apiGet('responsables');
+    const sel = document.getElementById('sat-asistente');
+    sel.innerHTML = '<option value="">— Elige tu nombre —</option>' + (r.responsables || []).map(n => `<option>${esc(n)}</option>`).join('');
+    try { const g = localStorage.getItem('sapito_sat_asistente'); if (g) sel.value = g; } catch (e) {}
+    sel.addEventListener('change', () => { try { localStorage.setItem('sapito_sat_asistente', sel.value); } catch (e) {} });
+  }
+  function diasDesde(ts) { return ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 864e5) : 9999; }
+  function fechaCorta(ts) { if (!ts) return '—'; const d = new Date(ts); return d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }); }
+
+  function setEstadoSateo(v) {
+    estadoSateo = v;
+    document.getElementById('sat-ok').className = v === 'ok' ? 'on-ok' : '';
+    document.getElementById('sat-prob').className = v === 'problema' ? 'on-prob' : '';
+  }
+  document.getElementById('sat-ok').addEventListener('click', () => setEstadoSateo('ok'));
+  document.getElementById('sat-prob').addEventListener('click', () => setEstadoSateo('problema'));
+  document.getElementById('btn-cam-sateo').addEventListener('click', () => { modoScan = 'sateo'; abrirScanner(); });
+
+  async function previaSateo() {
+    const sku = satSku.value.trim();
+    if (!sku) { satPrev.innerHTML = ''; return; }
+    satPrev.innerHTML = '<span class="muted">Buscando…</span>';
+    const r = await apiGet('buscarSku', { sku });
+    if (!r.success) { satPrev.innerHTML = '<span class="feedback error" style="margin:0;">SKU no encontrado</span>'; return; }
+    const prev = SATEOS.find(s => s.sku === sku);
+    const ult = prev ? `Último sateo: ${fechaCorta(prev.ultima_fecha)} · ${esc(prev.asistente || '')}` : 'Sin sateo registrado';
+    satPrev.innerHTML = `${fotoTag(sku)}<div style="min-width:0;"><div class="sat-desc">${esc(r.descripcion || r.desc || '')}</div><div class="sat-meta">${ult}</div></div>`;
+  }
+  satSku.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); previaSateo(); } });
+  satSku.addEventListener('blur', previaSateo);
+
+  document.getElementById('btn-sat-registrar').addEventListener('click', async () => {
+    const sku = satSku.value.trim();
+    const asistente = document.getElementById('sat-asistente').value;
+    const obs = document.getElementById('sat-obs').value.trim();
+    if (!asistente) { satFb.textContent = 'Elige quién sateó'; satFb.className = 'feedback error'; return; }
+    if (!sku) { satFb.textContent = 'Ingresa o escanea el SKU'; satFb.className = 'feedback error'; satSku.focus(); return; }
+    const btn = document.getElementById('btn-sat-registrar'); btn.disabled = true;
+    satFb.textContent = 'Guardando…'; satFb.className = 'feedback';
+    const { data, error } = await sb.rpc('registrar_sateo', { p_sku: sku, p_asistente: asistente, p_estado: estadoSateo, p_obs: obs });
+    btn.disabled = false;
+    if (error || !data || !data.success) { satFb.textContent = (data && data.message) || (error && error.message) || 'No se pudo guardar'; satFb.className = 'feedback error'; return; }
+    satFb.textContent = '✓ Sateo registrado: ' + (data.descripcion || sku); satFb.className = 'feedback ok';
+    satSku.value = ''; document.getElementById('sat-obs').value = ''; satPrev.innerHTML = ''; setEstadoSateo('ok');
+    satSku.focus();
+    cargarSateo();
+  });
+
+  async function cargarSateo() {
+    const { data, error } = await sb.from('sateo').select('*').order('ultima_fecha', { ascending: true });
+    if (error) { document.getElementById('sat-lista').innerHTML = `<div class="empty-state">Error: ${esc(error.message)}. ¿Corriste esquema_sateo.sql en Supabase?</div>`; return; }
+    SATEOS = data || [];
+    renderSateo();
+    if (itemsActuales.length) renderItems();
+  }
+
+  /* Estado de sateo de un SKU para mostrar en las listas */
+  function sateoCelda(sku, clickable) {
+    const s = SATEOS.find(x => x.sku === String(sku));
+    let cls, txt, sub;
+    if (!s) { cls = 'no'; txt = 'Sin sateo'; sub = clickable ? 'Satear →' : ''; }
+    else {
+      const d = diasDesde(s.ultima_fecha);
+      sub = new Date(s.ultima_fecha).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit' }) + ' · ' + d + (d === 1 ? ' día' : ' días');
+      if (d > SATEO_DIAS) { cls = 'venc'; txt = 'Volver a satear'; }
+      else if (s.estado === 'problema') { cls = 'prob'; txt = '⚠ Con problema'; }
+      else if (!s.validado_por) { cls = 'pend'; txt = 'Por validar'; }
+      else { cls = 'ok'; txt = '✓ Sateado'; }
+    }
+    const tip = s ? esc(`Último sateo: ${fechaCorta(s.ultima_fecha)} · ${s.asistente || ''}${s.validado_por ? ' · validó ' + s.validado_por : ''}${s.obs ? ' · ' + s.obs : ''}`) : 'Sin sateo registrado';
+    const inner = `${txt}${sub ? `<small>${sub}</small>` : ''}`;
+    return clickable
+      ? `<button type="button" class="sat-chip ${cls} row-sateo" data-sku="${esc(String(sku))}" title="${tip}">${inner}</button>`
+      : `<span class="sat-chip ${cls}" title="${tip}">${inner}</span>`;
+  }
+  function irASatear(sku) {
+    document.querySelector('.tab-btn[data-tab="sateo"]').click();
+    satSku.value = sku; previaSateo();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderSateo() {
+    const cont = document.getElementById('sat-lista'); if (!cont) return;
+    const venc = s => diasDesde(s.ultima_fecha) > SATEO_DIAS;
+    document.getElementById('sat-st-total').textContent = SATEOS.length;
+    document.getElementById('sat-st-pend').textContent = SATEOS.filter(s => !s.validado_por).length;
+    document.getElementById('sat-st-venc').textContent = SATEOS.filter(venc).length;
+    document.getElementById('sat-st-prob').textContent = SATEOS.filter(s => s.estado === 'problema').length;
+    const q = (document.getElementById('sat-buscar').value || '').trim().toLowerCase();
+    const lista = SATEOS.filter(s =>
+      (filtroSateo === 'todos' || (filtroSateo === 'pend' && !s.validado_por) || (filtroSateo === 'venc' && venc(s)) || (filtroSateo === 'prob' && s.estado === 'problema')) &&
+      (!q || String(s.sku).toLowerCase().includes(q) || String(s.descripcion || '').toLowerCase().includes(q)));
+    if (!lista.length) { cont.innerHTML = '<div class="empty-state">Sin productos para este filtro.</div>'; return; }
+    cont.innerHTML = lista.map(s => {
+      const d = diasDesde(s.ultima_fecha), v = d > SATEO_DIAS;
+      const val = s.validado_por
+        ? `<span class="sat-tag val">✓ Validado · ${esc(s.validado_por)}</span>`
+        : `<span class="sat-tag pend">Por validar</span>`;
+      const btnVal = s.validado_por ? '' : `<button class="btn small ${autorizadorDesbloqueado ? 'primary' : 'ghost'}" data-validar="${esc(s.sku)}" type="button">Validar</button>`;
+      return `<div class="sat-item${v ? ' vencido' : ''}">
+        ${fotoTag(s.sku)}
+        <div class="sat-main">
+          <div class="sat-desc">${esc(s.descripcion || '')}</div>
+          <div class="sat-meta"><span style="font-family:monospace;">${esc(s.sku)}</span> · ${fechaCorta(s.ultima_fecha)} · ${esc(s.asistente || '')}</div>
+          <div class="sat-tags">
+            ${s.estado === 'problema' ? '<span class="sat-tag prob">⚠ Con problema</span>' : '<span class="sat-tag ok">✓ OK</span>'}
+            ${val}
+            ${v ? `<span class="sat-tag venc">Más de ${SATEO_DIAS} días · volver a satear</span>` : ''}
+          </div>
+          ${s.obs ? `<div class="sat-obs">“${esc(s.obs)}”</div>` : ''}
+        </div>
+        <div class="sat-side">
+          <div class="sat-dias">${d}<small>${d === 1 ? 'día' : 'días'}</small></div>
+          ${btnVal}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('sat-filtros').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#sat-filtros button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); filtroSateo = b.dataset.f; renderSateo();
+  });
+  document.getElementById('sat-buscar').addEventListener('input', renderSateo);
+  document.getElementById('sat-lista').addEventListener('click', async e => {
+    const b = e.target.closest('[data-validar]'); if (!b) return;
+    if (!autorizadorDesbloqueado) { abrirDesbloqueo(); return; }
+    b.disabled = true;
+    const { data, error } = await sb.rpc('validar_sateo', { p_sku: b.dataset.validar, p_autorizado_por: sesionAutorizador.nombre, p_pin: sesionAutorizador.pin });
+    if (error || !data || !data.success) { alert((data && data.message) || (error && error.message) || 'No se pudo validar'); b.disabled = false; return; }
+    cargarSateo();
+  });
+  btnSatModo.addEventListener('click', () => { if (autorizadorDesbloqueado) bloquearAutorizador(); else abrirDesbloqueo(); });
+  function actualizarBotonSateo() {
+    if (!btnSatModo) return;
+    if (autorizadorDesbloqueado) { btnSatModo.textContent = '🔓 Validar: ' + sesionAutorizador.nombre + ' (bloquear)'; btnSatModo.className = 'btn small unlocked'; }
+    else { btnSatModo.textContent = '🔒 Validar: bloqueado'; btnSatModo.className = 'btn small locked'; }
+    renderSateo();
+  }
+
   cargarCache();
   initListas();
+  initSateo();
+  cargarSateo();
   inputEl.focus();
   </script>
 </body>
 </html>
+
