@@ -126,6 +126,15 @@
     .sat-chip.venc { background:var(--rojo); color:#fff; }
     .sat-chip.no { background:var(--gris-100); color:var(--gris-500); }
     button.sat-chip { cursor:pointer; }
+    .sat-cell { display:flex; flex-direction:column; gap:5px; min-width:120px; }
+    .sat-sel { padding:6px 8px; border:1.5px solid var(--gris-200); border-radius:8px; font-size:12px; font-weight:700; font-family:inherit; background:var(--gris-50); color:var(--gris-700); }
+    .sat-sel.sateado { background:var(--verde-bg); color:var(--verde); border-color:#86efac; }
+    .sat-sel.tachado { background:var(--amarillo-bg); color:var(--amarillo); border-color:#fcd34d; }
+    .sat-sel.sin { background:var(--rojo-bg); color:var(--rojo); border-color:#fca5a5; }
+    .sat-pill { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:800; }
+    .sat-pill.sateado { background:var(--verde-bg); color:var(--verde); }
+    .sat-pill.tachado { background:var(--amarillo-bg); color:var(--amarillo); }
+    .sat-pill.sin { background:var(--rojo-bg); color:var(--rojo); }
     /* ── SATEO ── */
     #view-sateo .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
     #view-sateo .field-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500); }
@@ -704,7 +713,7 @@
           if (!ls) return { success:false, message:'Lista no encontrada' };
           const { data: its } = await sb.from('lista_items').select('*').eq('lista_id', params.id).order('id');
           const items = (its||[]).map(it => ({ id:it.id, sku:it.sku, descripcion:it.descripcion, categoria:it.categoria,
-            tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', enInventario:true }));
+            tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', sateoEstado:it.sateo_estado||'', enInventario:true }));
           const lista = { id:ls.id, fechaCreacion:ls.fecha_creacion, responsable:ls.responsable, estado:ls.estado,
             fechaCierre:ls.fecha_cierre, totalItems:items.length, numeroDocumento:ls.numero_documento||'', autorizadoPor:ls.autorizado_por||'' };
           return { success:true, lista, items };
@@ -1101,7 +1110,7 @@
       const chkV = item.checkAutorizador ? 'checked' : '';
       const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
       const disV = autorizadorDesbloqueado ? '' : 'disabled';
-      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td>${sateoCelda(item.sku, true)}</td>`
+      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td><div class="sat-cell">${sateoCelda(item.sku, true)}<select class="sat-sel ${item.sateoEstado||''}" data-idx="${idx}" title="Estado del precio en este producto"><option value="">— Precio —</option>${SAT_OPC.map(o => `<option value="${o.v}"${item.sateoEstado===o.v?' selected':''}>${o.t}</option>`).join('')}</select></div></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
         + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
@@ -1111,6 +1120,7 @@
     body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
     body.querySelectorAll('.row-cant').forEach(b => b.addEventListener('click', () => editarCantidad(Number(b.dataset.idx))));
     body.querySelectorAll('.row-sateo').forEach(b => b.addEventListener('click', () => irASatear(b.dataset.sku)));
+    body.querySelectorAll('.sat-sel').forEach(s => s.addEventListener('change', () => marcarSateoItem(Number(s.dataset.idx), s.value, s)));
     body.querySelectorAll('.chk-asist').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'asistente', c.checked, c)));
     body.querySelectorAll('.chk-verif').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'autorizador', c.checked, c)));
   }
@@ -1369,7 +1379,7 @@
       (det.lista.numeroDocumento ? ' · Doc: ' + det.lista.numeroDocumento : '') +
       (det.lista.autorizadoPor ? ' · Autorizó: ' + det.lista.autorizadoPor : '');
     const body = document.getElementById('modal-items-body'); body.innerHTML = '';
-    det.items.forEach(item => { const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td>${sateoCelda(item.sku, false)}</td>`; body.appendChild(tr); });
+    det.items.forEach(item => { const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td>${item.cantidad}</td><td><div class="sat-cell">${item.sateoEstado ? `<span class="sat-pill ${item.sateoEstado}">${(SAT_OPC.find(o=>o.v===item.sateoEstado)||{}).t||''}</span>` : ''}${sateoCelda(item.sku, false)}</div></td>`; body.appendChild(tr); });
     document.getElementById('modal-detalle').classList.remove('hidden');
   }
   document.getElementById('modal-cerrar').addEventListener('click', () => document.getElementById('modal-detalle').classList.add('hidden'));
@@ -1562,6 +1572,28 @@
     if (itemsActuales.length) renderItems();
   }
 
+  /* Estado del precio de cada producto dentro de la lista */
+  const SAT_OPC = [ { v:'sateado', t:'✅ Sateado' }, { v:'tachado', t:'✏️ Tachado' }, { v:'sin', t:'⛔ Sin satear' } ];
+  async function marcarSateoItem(idx, valor, sel) {
+    const it = itemsActuales[idx]; if (!it) return;
+    const antes = it.sateoEstado || '';
+    sel.disabled = true;
+    const { error } = await sb.from('lista_items').update({ sateo_estado: valor }).eq('id', it.id);
+    sel.disabled = false;
+    if (error) {
+      alert('No se guardó: ' + error.message + (String(error.message).includes('sateo_estado') ? '\n\nFalta correr parche_sateo_lista.sql en Supabase.' : ''));
+      sel.value = antes; return;
+    }
+    it.sateoEstado = valor;
+    sel.className = 'sat-sel ' + valor;
+    // Si quedó sateado, también actualiza la fecha de último sateo del producto
+    if (valor === 'sateado') {
+      const resp = document.getElementById('lista-responsable-actual').textContent || '';
+      const r = await sb.rpc('registrar_sateo', { p_sku: String(it.sku), p_asistente: resp, p_estado: 'ok', p_obs: 'Desde lista' });
+      if (!r.error) cargarSateo();
+    }
+  }
+
   /* Estado de sateo de un SKU para mostrar en las listas */
   function sateoCelda(sku, clickable) {
     const s = SATEOS.find(x => x.sku === String(sku));
@@ -1655,4 +1687,5 @@
   </script>
 </body>
 </html>
+
 
