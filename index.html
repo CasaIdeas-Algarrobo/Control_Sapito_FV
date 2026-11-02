@@ -66,6 +66,12 @@
     }
     .tab-btn .ic { font-size:16px; }
     .tab-btn.active { color:var(--azul-600); border-bottom-color:var(--azul-600); }
+    @media (max-width:560px) {
+      .tabbar-inner { padding:0 4px; gap:0; }
+      .tab-btn { flex:1 1 0; min-width:0; flex-direction:column; gap:2px; padding:9px 2px 8px; font-size:11px; white-space:nowrap; position:relative; }
+      .tab-btn .ic { font-size:19px; line-height:1; }
+      #pick-badge { position:absolute; top:4px; right:50%; margin-right:-22px; font-size:10px !important; line-height:16px; min-width:16px; text-align:center; }
+    }
 
     /* ── MAIN ── */
     .main { flex:1; max-width:680px; width:100%; margin:0 auto; padding:18px 16px 48px; display:flex; flex-direction:column; gap:14px; }
