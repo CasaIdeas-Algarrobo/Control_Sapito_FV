@@ -228,6 +228,31 @@
     .lista-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
     .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
     .badge.pendiente { background:var(--amarillo-bg); color:var(--amarillo); }
+    #pick-badge.hidden, #pick-detalle.hidden, #pick-lista-card.hidden, .pick-estado.hidden { display:none !important; }
+    .lista-acciones { display:flex; flex-direction:column; gap:8px; align-items:stretch; flex-shrink:0; }
+    .pick-estado { margin-top:10px; padding:9px 12px; border-radius:10px; font-size:13px; font-weight:700; }
+    .pick-estado.solicitado { background:var(--amarillo-bg); color:var(--amarillo); }
+    .pick-estado.preparando { background:var(--azul-50, #eff6ff); color:var(--azul-700, #1d4ed8); }
+    .pick-estado.entregado { background:var(--verde-bg); color:var(--verde); }
+    .pick-card { border:1.5px solid var(--gris-200); border-radius:13px; padding:13px 15px; display:flex; align-items:center; gap:12px; cursor:pointer; background:var(--blanco); }
+    .pick-card + .pick-card { margin-top:8px; }
+    .pick-card:hover { border-color:var(--azul-400); }
+    .pick-card .pc-main { flex:1; min-width:0; }
+    .pick-card .pc-tit { font-size:15px; font-weight:800; }
+    .pick-card .pc-sub { font-size:12px; color:var(--gris-500); margin-top:3px; }
+    .pick-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--gris-100); }
+    .pick-item:first-child { border-top:none; }
+    .pick-item.ok .pi-desc { color:var(--gris-500); text-decoration:line-through; }
+    .pick-item .pi-main { flex:1; min-width:0; }
+    .pick-item .pi-desc { font-size:14px; font-weight:700; line-height:1.3; }
+    .pick-item .pi-sku { font-size:12px; color:var(--gris-500); font-family:monospace; margin-top:2px; }
+    .pick-cant { flex-shrink:0; text-align:center; background:var(--gris-100); border-radius:10px; padding:6px 10px; min-width:54px; }
+    .pick-cant b { display:block; font-size:18px; font-weight:900; }
+    .pick-cant small { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500); }
+    .pick-chk { flex-shrink:0; width:38px; height:38px; border-radius:10px; border:2px solid var(--gris-200); background:var(--blanco); font-size:20px; color:#fff; cursor:pointer; }
+    .pick-chk.on { background:var(--verde); border-color:var(--verde); }
+    .bar-pick { height:8px; background:var(--gris-100); border-radius:6px; overflow:hidden; margin-top:10px; }
+    .bar-pick div { height:100%; background:var(--verde); transition:width .3s; }
     .feedback { font-size:13px; margin-top:10px; min-height:18px; font-weight:600; }
     .feedback.ok { color:var(--verde); }
     .feedback.error { color:var(--rojo); }
@@ -348,6 +373,7 @@
     <div class="tabbar-inner">
       <button class="tab-btn active" data-tab="stock"><span class="ic">📦</span>Stock</button>
       <button class="tab-btn" data-tab="listas"><span class="ic">📋</span>Listas</button>
+      <button class="tab-btn" data-tab="bodega"><span class="ic">🚚</span>Bodega <span id="pick-badge" class="hidden" style="background:var(--rojo);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;"></span></button>
       <button class="tab-btn" data-tab="sateo"><span class="ic">🏷️</span>Sateo</button>
       <button class="tab-btn" data-tab="panel"><span class="ic">📊</span>Panel</button>
     </div>
@@ -398,8 +424,12 @@
             <h2 class="card-title" id="lista-responsable-actual">—</h2>
             <p class="muted" id="lista-fecha-actual">—</p>
           </div>
-          <button id="btn-abrir-cierre" class="btn danger-outline small">Cerrar lista</button>
+          <div class="lista-acciones">
+            <button id="btn-solicitar-bodega" class="btn primary small" type="button">📦 Solicitar a bodega</button>
+            <button id="btn-abrir-cierre" class="btn danger-outline small">Cerrar lista</button>
+          </div>
         </div>
+        <div id="pick-estado-lista" class="pick-estado hidden"></div>
 
         <div class="card">
           <div class="eyebrow">Agregar producto</div>
@@ -483,6 +513,39 @@
             <tbody id="cerradas-body"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ VIEW: BODEGA (picking) ═══════════ -->
+    <section id="view-bodega" class="view">
+      <div class="card">
+        <div class="eyebrow">Picking de bodega</div>
+        <p class="muted" style="margin-bottom:12px;">Listas que la sala pidió a bodega. Arma los productos, márcalos y avisa cuando estén en sala.</p>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gris-500);">Bodeguero</span>
+          <select id="pick-bodeguero"></select>
+        </div>
+      </div>
+      <div class="card" id="pick-lista-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
+          <h3 class="card-title" style="margin:0;">Solicitudes</h3>
+          <button class="btn ghost small" id="pick-refrescar" type="button">↻ Actualizar</button>
+        </div>
+        <div id="pick-lista"></div>
+      </div>
+      <div class="card hidden" id="pick-detalle">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div>
+            <h3 class="card-title" style="margin:0;" id="pick-tit">—</h3>
+            <p class="muted" id="pick-sub">—</p>
+          </div>
+          <button class="btn ghost small" id="pick-volver" type="button">← Volver</button>
+        </div>
+        <div class="bar-pick"><div id="pick-bar" style="width:0%"></div></div>
+        <p class="muted" id="pick-prog" style="margin-top:6px;">—</p>
+        <div id="pick-items" style="margin-top:8px;"></div>
+        <button class="btn primary" id="pick-entregar" type="button" style="width:100%; margin-top:14px;">✅ Entregado en sala</button>
+        <p class="feedback" id="pick-fb"></p>
       </div>
     </section>
 
@@ -703,7 +766,7 @@
           (data||[]).forEach(l => {
             const o = { id:l.id, fechaCreacion:l.fecha_creacion, responsable:l.responsable, estado:l.estado,
               fechaCierre:l.fecha_cierre, totalItems:(l.lista_items&&l.lista_items[0]&&l.lista_items[0].count)||0,
-              numeroDocumento:l.numero_documento||'', autorizadoPor:l.autorizado_por||'' };
+              numeroDocumento:l.numero_documento||'', autorizadoPor:l.autorizado_por||'', pickingEstado:l.picking_estado||'' };
             (l.estado==='Cerrada'?cerradas:pendientes).push(o);
           });
           return { success:true, pendientes, cerradas };
@@ -713,9 +776,10 @@
           if (!ls) return { success:false, message:'Lista no encontrada' };
           const { data: its } = await sb.from('lista_items').select('*').eq('lista_id', params.id).order('id');
           const items = (its||[]).map(it => ({ id:it.id, sku:it.sku, descripcion:it.descripcion, categoria:it.categoria,
-            tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', sateoEstado:it.sateo_estado||'', enInventario:true }));
+            tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', sateoEstado:it.sateo_estado||'', pickingOk:!!it.picking_ok, enInventario:true }));
           const lista = { id:ls.id, fechaCreacion:ls.fecha_creacion, responsable:ls.responsable, estado:ls.estado,
-            fechaCierre:ls.fecha_cierre, totalItems:items.length, numeroDocumento:ls.numero_documento||'', autorizadoPor:ls.autorizado_por||'' };
+            fechaCierre:ls.fecha_cierre, totalItems:items.length, numeroDocumento:ls.numero_documento||'', autorizadoPor:ls.autorizado_por||'',
+            pickingEstado:ls.picking_estado||'', pickingBodeguero:ls.picking_bodeguero||'', pickingSolicitadoTs:ls.picking_solicitado_ts||'', pickingEntregadoTs:ls.picking_entregado_ts||'' };
           return { success:true, lista, items };
         }
         case 'resumenMovimientos': {
@@ -812,6 +876,7 @@
       document.getElementById('view-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'panel') cargarDashboard();
       if (btn.dataset.tab === 'sateo') cargarSateo();
+      if (btn.dataset.tab === 'bodega') cargarPicking();
       if (btn.dataset.tab === 'stock') setTimeout(() => document.getElementById('skuInput').focus(), 50);
     });
   });
@@ -1043,6 +1108,8 @@
     document.getElementById('panel-sin-lista').style.display = 'none';
     document.getElementById('panel-con-lista').style.display = 'flex';
     document.getElementById('lista-responsable-actual').textContent = lista.responsable;
+    LISTA_ACTUAL = lista;
+    pintarEstadoPicking();
     document.getElementById('lista-fecha-actual').textContent =
       'Iniciada: ' + formatearFecha(lista.fechaCreacion) + (lista.numeroDocumento ? ' · Doc: ' + lista.numeroDocumento : '');
     itemsActuales = items || [];
@@ -1506,6 +1573,156 @@
      ARRANQUE
      ═══════════════════════════════════════════════ */
   /* ═══════════════════════════════════════════════
+     PICKING DE BODEGA
+     La sala pide la lista a bodega → el bodeguero arma y marca → avisa "entregado en sala"
+     → el responsable revisa y cierra la lista como siempre.
+     ═══════════════════════════════════════════════ */
+  let LISTA_ACTUAL = null, PICK_ACTUAL = null, PICK_ITEMS = [];
+  const PICK_TXT = { solicitado:'📦 Solicitada a bodega', preparando:'🚚 Bodega preparando', entregado:'✅ Entregado en sala' };
+  const horaCorta = ts => ts ? new Date(ts).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) : '';
+
+  function pintarEstadoPicking() {
+    const el = document.getElementById('pick-estado-lista'), btn = document.getElementById('btn-solicitar-bodega');
+    const e = (LISTA_ACTUAL && LISTA_ACTUAL.pickingEstado) || '';
+    if (!e) { el.classList.add('hidden'); btn.textContent = '📦 Solicitar a bodega'; btn.disabled = false; return; }
+    el.className = 'pick-estado ' + e;
+    let t = PICK_TXT[e] || e;
+    if (e === 'solicitado' && LISTA_ACTUAL.pickingSolicitadoTs) t += ' · ' + horaCorta(LISTA_ACTUAL.pickingSolicitadoTs);
+    if (e === 'preparando' && LISTA_ACTUAL.pickingBodeguero) t += ' · ' + LISTA_ACTUAL.pickingBodeguero;
+    if (e === 'entregado') t += (LISTA_ACTUAL.pickingBodeguero ? ' por ' + LISTA_ACTUAL.pickingBodeguero : '') + (LISTA_ACTUAL.pickingEntregadoTs ? ' · ' + horaCorta(LISTA_ACTUAL.pickingEntregadoTs) : '') + '. Revisa y cierra la lista.';
+    el.textContent = t;
+    btn.textContent = e === 'entregado' ? '📦 Volver a pedir a bodega' : '📦 Solicitud enviada';
+    btn.disabled = e !== 'entregado';
+  }
+
+  document.getElementById('btn-solicitar-bodega').addEventListener('click', async () => {
+    if (!listaActualId) return;
+    const salidas = itemsActuales.filter(i => i.tipo === 'SALIDA');
+    if (!itemsActuales.length) { alert('Agrega productos a la lista antes de pedirla a bodega.'); return; }
+    if (!confirm('¿Enviar esta lista a bodega para que armen ' + (salidas.length || itemsActuales.length) + ' producto(s)?')) return;
+    const btn = document.getElementById('btn-solicitar-bodega'); btn.disabled = true;
+    const ts = new Date().toISOString();
+    const { error } = await sb.from('listas').update({ picking_estado:'solicitado', picking_solicitado_ts:ts, picking_bodeguero:'', picking_entregado_ts:null }).eq('id', listaActualId);
+    if (error) { btn.disabled = false; alert('No se pudo enviar: ' + error.message + (String(error.message).includes('picking') ? '\n\nFalta correr parche_picking.sql en Supabase.' : '')); return; }
+    await sb.from('lista_items').update({ picking_ok:false }).eq('lista_id', listaActualId);
+    LISTA_ACTUAL = Object.assign({}, LISTA_ACTUAL, { pickingEstado:'solicitado', pickingSolicitadoTs:ts, pickingBodeguero:'', pickingEntregadoTs:'' });
+    pintarEstadoPicking();
+    actualizarBadgePicking();
+  });
+
+  async function initPicking() {
+    const r = await apiGet('responsables');
+    const sel = document.getElementById('pick-bodeguero');
+    const guard = localStorage.getItem('sapito_bodeguero') || '';
+    sel.innerHTML = '<option value="">— ¿Quién arma? —</option>' + ((r && r.responsables) || []).map(n => `<option${n===guard?' selected':''}>${esc(n)}</option>`).join('');
+    sel.addEventListener('change', () => localStorage.setItem('sapito_bodeguero', sel.value));
+  }
+
+  async function actualizarBadgePicking() {
+    const { data } = await sb.from('listas').select('id').eq('estado', 'Pendiente').in('picking_estado', ['solicitado', 'preparando']);
+    const n = (data || []).length, b = document.getElementById('pick-badge');
+    b.textContent = n; b.classList.toggle('hidden', !n);
+  }
+
+  async function cargarPicking() {
+    document.getElementById('pick-detalle').classList.add('hidden');
+    document.getElementById('pick-lista-card').classList.remove('hidden');
+    const cont = document.getElementById('pick-lista');
+    cont.innerHTML = '<div class="empty-state">⏳ Cargando…</div>';
+    const { data, error } = await sb.from('listas').select('*, lista_items(count)').eq('estado', 'Pendiente').neq('picking_estado', '').order('picking_solicitado_ts', { ascending:true });
+    if (error) { cont.innerHTML = `<div class="empty-state">Error: ${esc(error.message)}. ¿Corriste parche_picking.sql en Supabase?</div>`; return; }
+    const ls = (data || []).filter(l => l.picking_estado);
+    actualizarBadgePicking();
+    if (!ls.length) { cont.innerHTML = '<div class="empty-state">No hay solicitudes de bodega por ahora.</div>'; return; }
+    const orden = { solicitado:0, preparando:1, entregado:2 };
+    ls.sort((a, b) => (orden[a.picking_estado] - orden[b.picking_estado]));
+    cont.innerHTML = ls.map(l => {
+      const n = (l.lista_items && l.lista_items[0] && l.lista_items[0].count) || 0;
+      return `<div class="pick-card" data-pick="${l.id}">
+        <div class="pc-main">
+          <div class="pc-tit">${esc(l.responsable || '—')}${l.numero_documento ? ' · Doc ' + esc(l.numero_documento) : ''}</div>
+          <div class="pc-sub">${n} producto(s) · pedida ${horaCorta(l.picking_solicitado_ts)}${l.picking_bodeguero ? ' · ' + esc(l.picking_bodeguero) : ''}</div>
+        </div>
+        <span class="pick-estado ${l.picking_estado}" style="margin:0; white-space:nowrap;">${PICK_TXT[l.picking_estado] || ''}</span>
+      </div>`;
+    }).join('');
+    cont.querySelectorAll('[data-pick]').forEach(el => el.addEventListener('click', () => abrirPicking(el.dataset.pick)));
+  }
+
+  async function abrirPicking(id) {
+    const bod = document.getElementById('pick-bodeguero').value;
+    const det = await apiGet('listaDetalle', { id });
+    if (!det.success) { alert(det.message || 'No se pudo abrir'); return; }
+    PICK_ACTUAL = det.lista;
+    // Lo que se saca de bodega son las SALIDAS; si la lista no tiene, se muestran todas
+    PICK_ITEMS = det.items.filter(i => i.tipo === 'SALIDA');
+    if (!PICK_ITEMS.length) PICK_ITEMS = det.items;
+    if (PICK_ACTUAL.pickingEstado === 'solicitado' && bod) {
+      await sb.from('listas').update({ picking_estado:'preparando', picking_bodeguero:bod }).eq('id', id);
+      PICK_ACTUAL.pickingEstado = 'preparando'; PICK_ACTUAL.pickingBodeguero = bod;
+    }
+    document.getElementById('pick-lista-card').classList.add('hidden');
+    document.getElementById('pick-detalle').classList.remove('hidden');
+    document.getElementById('pick-tit').textContent = 'Lista de ' + PICK_ACTUAL.responsable;
+    document.getElementById('pick-sub').textContent = (PICK_TXT[PICK_ACTUAL.pickingEstado] || '') + (PICK_ACTUAL.numeroDocumento ? ' · Doc ' + PICK_ACTUAL.numeroDocumento : '') + (PICK_ACTUAL.pickingBodeguero ? ' · ' + PICK_ACTUAL.pickingBodeguero : '');
+    document.getElementById('pick-fb').textContent = '';
+    renderPicking();
+  }
+
+  function renderPicking() {
+    const listos = PICK_ITEMS.filter(i => i.pickingOk).length, tot = PICK_ITEMS.length;
+    document.getElementById('pick-bar').style.width = (tot ? Math.round(listos / tot * 100) : 0) + '%';
+    document.getElementById('pick-prog').textContent = listos + ' de ' + tot + ' productos listos';
+    const entregado = PICK_ACTUAL.pickingEstado === 'entregado';
+    document.getElementById('pick-items').innerHTML = PICK_ITEMS.map((it, i) => `<div class="pick-item${it.pickingOk ? ' ok' : ''}">
+        ${fotoTag(it.sku)}
+        <div class="pi-main"><div class="pi-desc">${esc(it.descripcion || '')}</div><div class="pi-sku">${esc(it.sku)} · ${it.tipo}</div></div>
+        <div class="pick-cant"><b>${it.cantidad}</b><small>Unid</small></div>
+        <button class="pick-chk${it.pickingOk ? ' on' : ''}" data-pick-i="${i}" type="button" ${entregado ? 'disabled' : ''}>${it.pickingOk ? '✓' : ''}</button>
+      </div>`).join('') || '<div class="empty-state">Esta lista no tiene productos.</div>';
+    const btn = document.getElementById('pick-entregar');
+    btn.disabled = entregado || !tot;
+    btn.textContent = entregado ? '✅ Ya entregado en sala' : (listos < tot ? '✅ Entregado en sala (' + listos + '/' + tot + ')' : '✅ Entregado en sala');
+    document.querySelectorAll('[data-pick-i]').forEach(b => b.addEventListener('click', async () => {
+      const it = PICK_ITEMS[+b.dataset.pickI], nuevo = !it.pickingOk;
+      it.pickingOk = nuevo; renderPicking();
+      const { error } = await sb.from('lista_items').update({ picking_ok:nuevo }).eq('id', it.id);
+      if (error) { it.pickingOk = !nuevo; renderPicking(); alert('No se guardó: ' + error.message); }
+    }));
+  }
+
+  document.getElementById('pick-volver').addEventListener('click', cargarPicking);
+  document.getElementById('pick-refrescar').addEventListener('click', cargarPicking);
+  document.getElementById('pick-entregar').addEventListener('click', async () => {
+    const bod = document.getElementById('pick-bodeguero').value || PICK_ACTUAL.pickingBodeguero;
+    if (!bod) { alert('Elige quién armó el pedido (Bodeguero).'); return; }
+    const faltan = PICK_ITEMS.filter(i => !i.pickingOk).length;
+    if (faltan && !confirm('Quedan ' + faltan + ' producto(s) sin marcar. ¿Avisar igual que está en sala?')) return;
+    const ts = new Date().toISOString();
+    const { error } = await sb.from('listas').update({ picking_estado:'entregado', picking_bodeguero:bod, picking_entregado_ts:ts }).eq('id', PICK_ACTUAL.id);
+    const fb = document.getElementById('pick-fb');
+    if (error) { fb.textContent = 'No se guardó: ' + error.message; fb.className = 'feedback error'; return; }
+    PICK_ACTUAL.pickingEstado = 'entregado'; PICK_ACTUAL.pickingBodeguero = bod;
+    fb.textContent = '✓ Avisado: el pedido está en sala. El responsable revisa y cierra la lista.'; fb.className = 'feedback ok';
+    renderPicking();
+    actualizarBadgePicking();
+    if (listaActualId === PICK_ACTUAL.id && LISTA_ACTUAL) { LISTA_ACTUAL = Object.assign({}, LISTA_ACTUAL, { pickingEstado:'entregado', pickingBodeguero:bod, pickingEntregadoTs:ts }); pintarEstadoPicking(); }
+  });
+
+  initPicking();
+  actualizarBadgePicking();
+  // Si la lista abierta está pedida a bodega, revisa cada 30 s si ya la entregaron
+  setInterval(async () => {
+    if (!listaActualId || !LISTA_ACTUAL || !['solicitado', 'preparando'].includes(LISTA_ACTUAL.pickingEstado)) return;
+    const { data } = await sb.from('listas').select('picking_estado,picking_bodeguero,picking_entregado_ts').eq('id', listaActualId).maybeSingle();
+    if (data && data.picking_estado !== LISTA_ACTUAL.pickingEstado) {
+      LISTA_ACTUAL = Object.assign({}, LISTA_ACTUAL, { pickingEstado:data.picking_estado, pickingBodeguero:data.picking_bodeguero || '', pickingEntregadoTs:data.picking_entregado_ts || '' });
+      pintarEstadoPicking();
+      if (data.picking_estado === 'entregado' && navigator.vibrate) navigator.vibrate([120, 60, 120]);
+    }
+  }, 30000);
+
+  /* ═══════════════════════════════════════════════
      SATEO (precio puesto a mano)
      ═══════════════════════════════════════════════ */
   const SATEO_DIAS = 30;
@@ -1687,5 +1904,4 @@
   </script>
 </body>
 </html>
-
 
