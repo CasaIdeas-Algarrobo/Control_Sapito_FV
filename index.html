@@ -1455,6 +1455,17 @@
   // Aprobar / rechazar: abre un modal para elegir el autorizador y poner su PIN
   let resCtx = null;
   const modalRes = document.getElementById('modal-resolver');
+  function pedirEliminarLista(id, responsable, n) {
+    resCtx = { tipo:'eliminarLista', id };
+    document.getElementById('res-titulo').textContent = 'Eliminar lista pendiente';
+    document.getElementById('res-detalle').textContent = `Lista de ${responsable || '—'} · ${n} producto(s). Se borra la lista y sus productos; no afecta el stock.`;
+    const btn = document.getElementById('btn-confirmar-res');
+    btn.textContent = 'Eliminar lista'; btn.className = 'btn danger-outline';
+    document.getElementById('select-res-autorizador').value = '';
+    document.getElementById('input-res-pin').value = '';
+    document.getElementById('res-feedback').textContent = '';
+    modalRes.classList.remove('hidden');
+  }
   function resolverAjustePendiente(id, aprobar, aj) {
     resCtx = { id, aprobar };
     document.getElementById('res-titulo').textContent = aprobar ? 'Aprobar corrección de stock' : 'Rechazar corrección de stock';
@@ -1477,19 +1488,30 @@
     if (!pin) { fb.textContent = 'Ingresa el PIN'; fb.className = 'feedback error'; return; }
     const btn = document.getElementById('btn-confirmar-res'); btn.disabled = true;
     fb.textContent = 'Procesando…'; fb.className = 'feedback';
-    const resp = await apiPost('resolverAjustePendiente', { id: resCtx.id, aprobar: resCtx.aprobar, autorizadoPor, pin });
+    let resp;
+    if (resCtx.tipo === 'eliminarLista') {
+      const { data, error } = await sb.rpc('eliminar_lista', { p_lista_id: resCtx.id, p_autorizado_por: autorizadoPor, p_pin: pin });
+      resp = error ? { success:false, message: error.message + (String(error.message).includes('eliminar_lista') ? ' · Falta correr parche_eliminar_lista.sql en Supabase.' : '') } : data;
+    } else {
+      resp = await apiPost('resolverAjustePendiente', { id: resCtx.id, aprobar: resCtx.aprobar, autorizadoPor, pin });
+    }
     btn.disabled = false;
-    if (!resp.success) { fb.textContent = resp.message || 'No se pudo procesar'; fb.className = 'feedback error'; return; }
+    if (!resp || !resp.success) { fb.textContent = (resp && resp.message) || 'No se pudo procesar'; fb.className = 'feedback error'; return; }
     modalRes.classList.add('hidden');
-    cargarAjustesPendientes();
+    if (resCtx.tipo === 'eliminarLista') {
+      if (listaActualId === resCtx.id) { listaActualId = null; itemsActuales = []; LISTA_ACTUAL = null; document.getElementById('panel-con-lista').style.display = 'none'; document.getElementById('panel-sin-lista').style.display = 'block'; }
+      try { olvidarMiPedido(resCtx.id); } catch (e) {}
+      cargarDashboard();
+    } else cargarAjustesPendientes();
   });
 
   function renderTablaPendientes(p) {
     const body = document.getElementById('pendientes-body'); body.innerHTML = '';
     if (!p.length) { body.innerHTML = '<tr><td colspan="4" class="muted">No hay listas pendientes</td></tr>'; return; }
     const PICK_ICO = { solicitado:['📦','Solicitada a bodega','solicitado'], preparando:['🚚','Bodega preparando','preparando'], entregado:['✅','Entregada en sala','entregado'] };
-    p.forEach(l => { const pk = PICK_ICO[l.pickingEstado]; const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}${pk ? ` <span class="pick-estado ${pk[2]}" title="${pk[1]}" style="display:inline-flex; margin:0 0 0 6px; padding:2px 8px; font-size:11px; border-radius:20px; white-space:nowrap;">${pk[0]} ${pk[1]}</span>` : ''}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td><button class="btn small primary" data-id="${l.id}">Continuar</button></td>`; body.appendChild(tr); });
-    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => continuarLista(b.dataset.id)));
+    p.forEach(l => { const pk = PICK_ICO[l.pickingEstado]; const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}${pk ? ` <span class="pick-estado ${pk[2]}" title="${pk[1]}" style="display:inline-flex; margin:0 0 0 6px; padding:2px 8px; font-size:11px; border-radius:20px; white-space:nowrap;">${pk[0]} ${pk[1]}</span>` : ''}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td style="white-space:nowrap;"><button class="btn small primary" data-id="${l.id}">Continuar</button> <button class="btn small danger-outline" data-del-lista="${l.id}" data-resp="${esc(l.responsable)}" data-n="${l.totalItems}" title="Eliminar lista (requiere autorizador)">🗑️</button></td>`; body.appendChild(tr); });
+    body.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => continuarLista(b.dataset.id)));
+    body.querySelectorAll('[data-del-lista]').forEach(b => b.addEventListener('click', () => pedirEliminarLista(b.dataset.delLista, b.dataset.resp, +b.dataset.n)));
   }
   // Listas cerradas: las 5 más recientes y "Ver más" de 10 en 10
   let CERRADAS = [], cerradasVisibles = 5;
@@ -2046,3 +2068,4 @@
   </script>
 </body>
 </html>
+
