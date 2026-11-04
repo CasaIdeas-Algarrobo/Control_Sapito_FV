@@ -1487,7 +1487,8 @@
   function renderTablaPendientes(p) {
     const body = document.getElementById('pendientes-body'); body.innerHTML = '';
     if (!p.length) { body.innerHTML = '<tr><td colspan="4" class="muted">No hay listas pendientes</td></tr>'; return; }
-    p.forEach(l => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td><button class="btn small primary" data-id="${l.id}">Continuar</button></td>`; body.appendChild(tr); });
+    const PICK_ICO = { solicitado:['📦','Solicitada a bodega','solicitado'], preparando:['🚚','Bodega preparando','preparando'], entregado:['✅','Entregada en sala','entregado'] };
+    p.forEach(l => { const pk = PICK_ICO[l.pickingEstado]; const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}${pk ? ` <span class="pick-estado ${pk[2]}" title="${pk[1]}" style="display:inline-flex; margin:0 0 0 6px; padding:2px 8px; font-size:11px; border-radius:20px; white-space:nowrap;">${pk[0]} ${pk[1]}</span>` : ''}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td><button class="btn small primary" data-id="${l.id}">Continuar</button></td>`; body.appendChild(tr); });
     body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => continuarLista(b.dataset.id)));
   }
   // Listas cerradas: las 5 más recientes y "Ver más" de 10 en 10
@@ -2045,4 +2046,3 @@
   </script>
 </body>
 </html>
-
