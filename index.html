@@ -1086,11 +1086,52 @@
           <div class="res-field desc-field span2"><div class="res-field-label">Descripción</div><div class="res-field-value">${esc(data.desc) || '<em style="color:#9ca3af">Sin descripción</em>'}</div></div>
           <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}<div style="margin-top:12px;"><button class="btn ghost small" id="btn-ajustar-stock" data-sku="${esc(String(data.sku))}" data-desc="${esc(data.desc||'')}" data-stock="${Number(stock)}" type="button">✏️ Corregir stock</button></div></div>
           <div class="res-field"><div class="res-field-label">SKU</div><div class="res-field-value" style="font-family:monospace;font-size:15px;word-break:break-all">${esc(String(data.sku))}</div></div>
+        </div>
+        <div id="res-sateo" data-sku="${esc(String(data.sku))}" style="margin-top:14px; border:1.5px solid var(--gris-200); border-radius:12px; padding:14px; background:var(--gris-50);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <span style="font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--gris-500);">🏷️ Sateo</span>
+            <span id="res-sat-chip">${sateoCelda(data.sku, false)}</span>
+          </div>
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; margin-top:12px;">
+            <select id="res-sat-asist" style="min-width:0; padding:10px 12px; border:2px solid var(--gris-200); border-radius:10px; font-size:15px; font-family:inherit; background:var(--blanco);">${document.getElementById('sat-asistente') ? document.getElementById('sat-asistente').innerHTML : ''}</select>
+            <button type="button" class="btn small" id="res-sat-ok" data-est="ok" style="background:var(--verde-bg); color:var(--verde); border:2px solid var(--verde);">✓ OK</button>
+            <button type="button" class="btn small" id="res-sat-prob" data-est="problema" style="background:var(--blanco); color:var(--rojo); border:2px solid var(--gris-200);">⚠ Problema</button>
+          </div>
+          <input type="text" id="res-sat-obs" placeholder="Observación (opcional)" autocomplete="off" style="width:100%; margin-top:8px; padding:10px 12px; border:2px solid var(--gris-200); border-radius:10px; font-size:15px; font-family:inherit; box-sizing:border-box;"/>
+          <button type="button" class="btn primary" id="res-sat-registrar" style="width:100%; margin-top:10px;">Registrar sateo</button>
+          <p class="feedback" id="res-sat-fb" style="margin:8px 0 0;"></p>
         </div></div>`;
     } else {
       resultadoEl.innerHTML = `<div class="res-error"><div class="error-icon">🔎</div><div><div class="error-title">No encontrado</div><div class="error-msg">${esc((data&&data.error)||'SKU no encontrado')}</div></div></div>`;
     }
     resultadoEl.classList.remove('hidden');
+    const satBox = document.getElementById('res-sateo');
+    if (satBox) {
+      let est = 'ok';
+      const bOk = document.getElementById('res-sat-ok'), bPr = document.getElementById('res-sat-prob');
+      const pintarEst = () => {
+        bOk.style.background = est === 'ok' ? 'var(--verde-bg)' : 'var(--blanco)'; bOk.style.borderColor = est === 'ok' ? 'var(--verde)' : 'var(--gris-200)';
+        bPr.style.background = est === 'problema' ? 'var(--rojo-bg)' : 'var(--blanco)'; bPr.style.borderColor = est === 'problema' ? 'var(--rojo)' : 'var(--gris-200)';
+      };
+      bOk.onclick = () => { est = 'ok'; pintarEst(); };
+      bPr.onclick = () => { est = 'problema'; pintarEst(); };
+      const selA = document.getElementById('res-sat-asist');
+      try { const g = localStorage.getItem('sapito_sateo_asist'); if (g) selA.value = g; } catch (e) {}
+      document.getElementById('res-sat-registrar').onclick = async () => {
+        const fb = document.getElementById('res-sat-fb'), btn = document.getElementById('res-sat-registrar');
+        const asistente = selA.value, sku = satBox.dataset.sku, obs = document.getElementById('res-sat-obs').value.trim();
+        if (!asistente) { fb.textContent = 'Elige quién sateó'; fb.className = 'feedback error'; return; }
+        try { localStorage.setItem('sapito_sateo_asist', asistente); } catch (e) {}
+        btn.disabled = true; fb.textContent = 'Guardando…'; fb.className = 'feedback';
+        const { data: r, error } = await sb.rpc('registrar_sateo', { p_sku: sku, p_asistente: asistente, p_estado: est, p_obs: obs });
+        btn.disabled = false;
+        if (error || !r || !r.success) { fb.textContent = (r && r.message) || (error && error.message) || 'No se pudo guardar'; fb.className = 'feedback error'; return; }
+        fb.textContent = '✓ Sateo registrado'; fb.className = 'feedback ok';
+        document.getElementById('res-sat-obs').value = '';
+        await cargarSateo();
+        const chip = document.getElementById('res-sat-chip'); if (chip) chip.innerHTML = sateoCelda(sku, false);
+      };
+    }
     const btnAj = document.getElementById('btn-ajustar-stock');
     if (btnAj) btnAj.addEventListener('click', () => {
       abrirAjuste(btnAj.dataset.sku, btnAj.dataset.desc, Number(btnAj.dataset.stock), () => buscar());
@@ -1225,7 +1266,7 @@
       const chkV = item.checkAutorizador ? 'checked' : '';
       const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
       const disV = autorizadorDesbloqueado ? '' : 'disabled';
-      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td><div class="sat-cell">${sateoCelda(item.sku, true)}<select class="sat-sel ${item.sateoEstado||''}" data-idx="${idx}" title="Estado del precio en este producto"><option value="">— Precio —</option>${SAT_OPC.map(o => `<option value="${o.v}"${item.sateoEstado===o.v?' selected':''}>${o.t}</option>`).join('')}</select></div></td>`
+      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td><div class="sat-cell">${sateoCelda(item.sku, false)}<select class="sat-sel ${item.sateoEstado||''}" data-idx="${idx}" title="Estado del precio en este producto"><option value="">— Precio —</option>${SAT_OPC.map(o => `<option value="${o.v}"${item.sateoEstado===o.v?' selected':''}>${o.t}</option>`).join('')}</select></div></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
         + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
@@ -1234,7 +1275,6 @@
     document.getElementById('items-count').textContent = itemsActuales.length + (itemsActuales.length === 1 ? ' producto' : ' productos');
     body.querySelectorAll('.row-delete').forEach(b => b.addEventListener('click', () => eliminarItem(Number(b.dataset.idx))));
     body.querySelectorAll('.row-cant').forEach(b => b.addEventListener('click', () => editarCantidad(Number(b.dataset.idx))));
-    body.querySelectorAll('.row-sateo').forEach(b => b.addEventListener('click', () => irASatear(b.dataset.sku)));
     body.querySelectorAll('.sat-sel').forEach(s => s.addEventListener('change', () => marcarSateoItem(Number(s.dataset.idx), s.value, s)));
     body.querySelectorAll('.chk-asist').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'asistente', c.checked, c)));
     body.querySelectorAll('.chk-verif').forEach(c => c.addEventListener('change', () => marcarItem(Number(c.dataset.idx), 'autorizador', c.checked, c)));
