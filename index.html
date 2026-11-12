@@ -413,6 +413,28 @@
         <div class="empty-icon">📦</div>
         <p class="empty-text">Ingresa o escanea un SKU, código madre o descripción para consultar el stock en bodega.</p>
       </div>
+
+      <div class="card" id="sb-card">
+        <button type="button" id="sb-toggle" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; text-align:left;">
+          <span style="display:flex; flex-direction:column; gap:2px;">
+            <span style="font-size:15px; font-weight:800; color:var(--gris-900);">⚠️ Stock bajo · menos de 3 unidades</span>
+            <span id="sb-resumen" style="font-size:12px; color:var(--gris-500); font-weight:600;">Toca para ver la lista</span>
+          </span>
+          <span id="sb-flecha" style="font-size:18px; color:var(--gris-500);">▾</span>
+        </button>
+        <div id="sb-cuerpo" class="hidden" style="margin-top:14px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="text" id="sb-buscar" placeholder="Filtrar por SKU o descripción" autocomplete="off" style="flex:1; min-width:160px; padding:10px 12px; border:2px solid var(--gris-200); border-radius:10px; font-size:15px; font-family:inherit;"/>
+            <select id="sb-filtro" style="padding:10px 12px; border:2px solid var(--gris-200); border-radius:10px; font-size:14px; font-family:inherit; background:var(--blanco);">
+              <option value="sin">Sin actualizar</option>
+              <option value="todos">Todos</option>
+              <option value="act">Ya actualizados</option>
+              <option value="pend">Con corrección pendiente</option>
+            </select>
+          </div>
+          <div id="sb-lista" style="margin-top:12px;"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ═══════════ VIEW: LISTAS ═══════════ -->
@@ -423,6 +445,9 @@
         <p class="muted">Elige el responsable de esta lista antes de empezar a ingresar SKU's.</p>
         <div class="form-row" style="margin-top:14px;">
           <select id="select-responsable"></select>
+          <input id="input-pin-responsable" type="password" inputmode="numeric" maxlength="8" placeholder="Tu clave" autocomplete="off"/>
+        </div>
+        <div class="form-row" style="margin-top:10px;">
           <input id="input-documento" type="text" placeholder="N° Documento (opcional)"/>
         </div>
         <div class="form-row" style="margin-top:10px;">
@@ -1039,6 +1064,75 @@
   function cerrarSugerencias() { suggestEl.classList.add('hidden'); suggestEl.innerHTML = ''; sugActiva = -1; }
 
   document.getElementById('btnConsultar').addEventListener('click', buscar);
+  /* ══ Correcciones de stock: cuándo se actualizó cada SKU ══ */
+  const AJ = {};               // sku -> { ult_fecha, ult_por, ult_anterior, ult_nuevo, pend_fecha, pend_por, pend_propuesto }
+  const AJ_DIAS = 30;          // una corrección vale como "actualizado" por 30 días
+  function fechaCorta(iso) { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit' }); }
+  function ajReciente(a) { return a && a.ult_fecha && (Date.now() - new Date(a.ult_fecha).getTime()) < AJ_DIAS * 864e5; }
+  function ajusteBadge(sku) {
+    const a = AJ[String(sku)]; if (!a) return '';
+    if (a.pend_fecha) return `<span title="Corrección propuesta por ${esc(a.pend_por||'')} · esperando aprobación" style="display:inline-block; margin-top:4px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--amarillo-bg); color:var(--amarillo); white-space:nowrap;">⏳ Corrección pendiente ${fechaCorta(a.pend_fecha)}</span>`;
+    if (ajReciente(a)) return `<span title="De ${a.ult_anterior} a ${a.ult_nuevo} · ${esc(a.ult_por||'')}" style="display:inline-block; margin-top:4px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--verde-bg); color:var(--verde); white-space:nowrap;">✅ Stock actualizado ${fechaCorta(a.ult_fecha)}</span>`;
+    return '';
+  }
+  async function asegurarAjustes(skus) {
+    const faltan = [...new Set(skus.map(String))].filter(k => k && !(k in AJ));
+    if (!faltan.length) return false;
+    faltan.forEach(k => AJ[k] = null);
+    const { data, error } = await sb.rpc('ultimos_ajustes', { p_skus: faltan });
+    if (error) { console.warn('ultimos_ajustes:', error.message); return false; }
+    (data || []).forEach(r => AJ[r.sku] = r);
+    return true;
+  }
+  function olvidarAjuste(sku) { delete AJ[String(sku)]; SB_CARGADO = false; }
+
+  let SB_DATOS = [], SB_CARGADO = false;
+  document.getElementById('sb-toggle').addEventListener('click', () => {
+    const c = document.getElementById('sb-cuerpo'), abrir = c.classList.contains('hidden');
+    c.classList.toggle('hidden', !abrir);
+    document.getElementById('sb-flecha').textContent = abrir ? '▴' : '▾';
+    if (abrir && !SB_CARGADO) cargarStockBajo();
+  });
+  document.getElementById('sb-buscar').addEventListener('input', renderStockBajo);
+  document.getElementById('sb-filtro').addEventListener('change', renderStockBajo);
+  async function cargarStockBajo() {
+    const cont = document.getElementById('sb-lista');
+    cont.innerHTML = '<div class="loading"><div class="spinner"></div><p>Buscando productos con stock bajo…</p></div>';
+    const { data, error } = await sb.rpc('stock_bajo', { p_max: 3 });
+    if (error) { cont.innerHTML = `<div class="empty-state">Error: ${esc(error.message)}${String(error.message).includes('stock_bajo') ? '. Falta correr parche_stock_bajo.sql en Supabase.' : ''}</div>`; return; }
+    SB_DATOS = data || []; SB_CARGADO = true;
+    SB_DATOS.forEach(r => AJ[r.sku] = r);
+    renderStockBajo();
+  }
+  function renderStockBajo() {
+    const q = document.getElementById('sb-buscar').value.trim().toLowerCase(), f = document.getElementById('sb-filtro').value;
+    const act = SB_DATOS.filter(r => ajReciente(r) && !r.pend_fecha).length, pend = SB_DATOS.filter(r => r.pend_fecha).length;
+    document.getElementById('sb-resumen').textContent = SB_CARGADO
+      ? `${SB_DATOS.length} productos · ${SB_DATOS.length - act - pend} sin actualizar · ${act} actualizados · ${pend} pendientes` : 'Toca para ver la lista';
+    const rows = SB_DATOS.filter(r => {
+      if (q && !String(r.sku).toLowerCase().includes(q) && !String(r.descripcion||'').toLowerCase().includes(q)) return false;
+      if (f === 'sin') return !ajReciente(r) && !r.pend_fecha;
+      if (f === 'act') return ajReciente(r) && !r.pend_fecha;
+      if (f === 'pend') return !!r.pend_fecha;
+      return true;
+    });
+    const cont = document.getElementById('sb-lista');
+    if (!rows.length) { cont.innerHTML = '<div class="empty-state">Sin productos en este filtro.</div>'; return; }
+    const MAX = 300;
+    cont.innerHTML = rows.slice(0, MAX).map(r => `<button type="button" data-sb-sku="${esc(r.sku)}" style="width:100%; display:flex; align-items:center; gap:12px; padding:10px 4px; border:none; border-bottom:1px solid var(--gris-100); background:none; cursor:pointer; text-align:left; font-family:inherit;">
+        ${fotoTag(r.sku)}
+        <span style="flex:1; min-width:0; display:flex; flex-direction:column;">
+          <span style="font-size:14px; font-weight:700; color:var(--gris-900);">${esc(r.descripcion || '(sin descripción)')}</span>
+          <span style="font-size:12px; color:var(--gris-500); font-family:monospace;">${esc(r.sku)}${r.categoria ? ' · ' + esc(r.categoria) : ''}</span>
+          <span>${ajusteBadge(r.sku) || '<span style="display:inline-block; margin-top:4px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--rojo-bg); color:var(--rojo);">Sin actualizar</span>'}</span>
+        </span>
+        <span style="flex-shrink:0; text-align:center; min-width:46px;"><b style="font-size:20px; color:${Number(r.stock) <= 0 ? 'var(--rojo)' : 'var(--amarillo)'};">${Number(r.stock)}</b><br><small style="font-size:10px; color:var(--gris-500);">unid</small></span>
+      </button>`).join('') + (rows.length > MAX ? `<div class="empty-state" style="padding:12px;">Mostrando ${MAX} de ${rows.length}. Usa el filtro para acotar.</div>` : '');
+    cont.querySelectorAll('[data-sb-sku]').forEach(b => b.addEventListener('click', () => {
+      inputEl.value = b.dataset.sbSku; buscar(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+  }
+
   async function buscar() {
     const sku = inputEl.value.trim();
     if (!sku) { inputEl.focus(); return; }
@@ -1048,6 +1142,7 @@
     resultadoEl.innerHTML = `<div class="loading"><div class="spinner"></div><p>Consultando bodega…</p></div>`;
     try {
       const data = await apiGet('buscar', { sku });
+      if (data && data.success) await asegurarAjustes([data.sku]);
       mostrarResultado(data);
     } catch (e) {
       resultadoEl.innerHTML = `<div class="res-error"><div class="error-icon">⚠️</div><div><div class="error-title">Error de conexión</div><div class="error-msg">No se pudo conectar.</div></div></div>`;
@@ -1084,7 +1179,7 @@
         <div style="display:flex; justify-content:center; margin-bottom:14px;">${fotoTag(data.sku, 'res-foto')}</div>
         <div class="res-grid">
           <div class="res-field desc-field span2"><div class="res-field-label">Descripción</div><div class="res-field-value">${esc(data.desc) || '<em style="color:#9ca3af">Sin descripción</em>'}</div></div>
-          <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}<div style="margin-top:12px;"><button class="btn ghost small" id="btn-ajustar-stock" data-sku="${esc(String(data.sku))}" data-desc="${esc(data.desc||'')}" data-stock="${Number(stock)}" type="button">✏️ Corregir stock</button></div></div>
+          <div class="res-field"><div class="res-field-label">Stock en Bodega</div><div class="stock-num">${Number(stock).toLocaleString('es-CL')}</div><div class="stock-unit">unidades</div>${badge}${ajusteBadge(data.sku) ? '<div>' + ajusteBadge(data.sku) + '</div>' : ''}<div style="margin-top:12px;"><button class="btn ghost small" id="btn-ajustar-stock" data-sku="${esc(String(data.sku))}" data-desc="${esc(data.desc||'')}" data-stock="${Number(stock)}" type="button">✏️ Corregir stock</button></div></div>
           <div class="res-field"><div class="res-field-label">SKU</div><div class="res-field-value" style="font-family:monospace;font-size:15px;word-break:break-all">${esc(String(data.sku))}</div></div>
         </div>
         <div id="res-sateo" data-sku="${esc(String(data.sku))}" style="margin-top:14px; border:1.5px solid var(--gris-200); border-radius:12px; padding:14px; background:var(--gris-50);">
@@ -1174,17 +1269,25 @@
   document.getElementById('btn-crear-lista').addEventListener('click', async () => {
     const responsable = document.getElementById('select-responsable').value;
     const numeroDocumento = document.getElementById('input-documento').value.trim();
+    const pinEl = document.getElementById('input-pin-responsable'), pin = pinEl.value.trim();
+    if (!pin) { pinEl.focus(); alert('Ingresa tu clave para crear la lista.'); return; }
     const btn = document.getElementById('btn-crear-lista');
     btn.disabled = true;
+    const v = await sb.rpc('verificar_pin_responsable', { p_nombre: responsable, p_pin: pin });
+    if (v.error) { btn.disabled = false; alert('Error: ' + v.error.message + (String(v.error.message).includes('verificar_pin_responsable') ? '\n\nFalta correr parche_clave_listas.sql en Supabase.' : '')); return; }
+    if (!v.data || !v.data.success) { btn.disabled = false; alert((v.data && v.data.message) || 'Clave incorrecta'); pinEl.value = ''; pinEl.focus(); return; }
     const resp = await apiPost('crearLista', { responsable, numeroDocumento });
     btn.disabled = false;
     if (!resp.success) { alert(resp.message || 'No se pudo crear la lista'); return; }
+    pinEl.value = '';
+    LISTAS_ABIERTAS.add(resp.id);
     listaActualId = resp.id;
     mostrarPanelConLista(resp, []);
   });
 
   document.getElementById('btn-salir-lista').addEventListener('click', () => {
     if (!confirm('¿Salir de esta lista para iniciar otra? Queda pendiente y la retomas desde Panel → Listas pendientes.')) return;
+    if (listaActualId) LISTAS_ABIERTAS.delete(listaActualId);
     listaActualId = null; itemsActuales = []; LISTA_ACTUAL = null;
     document.getElementById('panel-con-lista').style.display = 'none';
     document.getElementById('panel-sin-lista').style.display = 'block';
@@ -1258,6 +1361,7 @@
   function renderItems() {
     const body = document.getElementById('items-body');
     body.innerHTML = '';
+    asegurarAjustes(itemsActuales.map(i => i.sku)).then(n => { if (n) renderItems(); });
     itemsActuales.forEach((item, idx) => {
       const tr = document.createElement('tr');
       const tipoClass = item.tipo === 'ENTRADA' ? 'entrada' : 'salida';
@@ -1266,7 +1370,7 @@
       const chkV = item.checkAutorizador ? 'checked' : '';
       const verifTitle = item.checkAutorizador ? esc('Verificado por ' + item.checkAutorizador) : 'Verificación de autorizador';
       const disV = autorizadorDesbloqueado ? '' : 'disabled';
-      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}</td><td><div class="sat-cell">${sateoCelda(item.sku, false)}<select class="sat-sel ${item.sateoEstado||''}" data-idx="${idx}" title="Estado del precio en este producto"><option value="">— Precio —</option>${SAT_OPC.map(o => `<option value="${o.v}"${item.sateoEstado===o.v?' selected':''}>${o.t}</option>`).join('')}</select></div></td>`
+      tr.innerHTML = `<td>${fotoTag(item.sku)}</td><td style="font-family:monospace">${esc(item.sku)}</td><td>${esc(item.descripcion)}${nuevo}</td><td><span class="tipo-pill ${tipoClass}">${item.tipo}</span></td><td><button type="button" class="row-cant" data-idx="${idx}" title="Modificar cantidad" style="background:none;border:none;font:inherit;font-weight:700;color:var(--azul-600,#2563eb);cursor:pointer;padding:2px 4px;">${item.cantidad} ✏️</button></td><td>${item.stock}${ajusteBadge(item.sku) ? '<br>' + ajusteBadge(item.sku) : ''}</td><td><div class="sat-cell">${sateoCelda(item.sku, false)}<select class="sat-sel ${item.sateoEstado||''}" data-idx="${idx}" title="Estado del precio en este producto"><option value="">— Precio —</option>${SAT_OPC.map(o => `<option value="${o.v}"${item.sateoEstado===o.v?' selected':''}>${o.t}</option>`).join('')}</select></div></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk chk-asist" data-idx="${idx}" ${chkA} title="Marcar salida (asistente)"></td>`
         + `<td class="chk-cell"><input type="checkbox" class="chk verif chk-verif" data-idx="${idx}" ${chkV} ${disV} title="${verifTitle}"></td>`
         + `<td><button class="row-delete" data-idx="${idx}">Quitar</button></td>`;
@@ -1412,6 +1516,7 @@
     btn.disabled = false;
     if (!resp.success) { ajusteFeedback.textContent = resp.message || 'No se pudo ajustar'; ajusteFeedback.className = 'feedback error'; return; }
     modalAjuste.classList.add('hidden');
+    olvidarAjuste(ajusteCtx.sku);
     if (typeof ajusteCtx.onDone === 'function') ajusteCtx.onDone();
   }
 
@@ -1425,6 +1530,7 @@
     const resp = await apiPost('proponerAjuste', { sku, nuevoStock: nuevoNum, propuestoPor: responsable, listaId: listaActualId });
     const fb = document.getElementById('preview-feedback');
     if (!resp.success) { fb.textContent = resp.message || 'No se pudo enviar la propuesta'; fb.className = 'feedback error'; return; }
+    olvidarAjuste(sku);
     fb.textContent = '📩 ' + (resp.message || 'Propuesta enviada. Quedará pendiente hasta que un supervisor la apruebe.');
     fb.className = 'feedback ok';
   }
@@ -1542,7 +1648,7 @@
       if (listaActualId === resCtx.id) { listaActualId = null; itemsActuales = []; LISTA_ACTUAL = null; document.getElementById('panel-con-lista').style.display = 'none'; document.getElementById('panel-sin-lista').style.display = 'block'; }
       try { olvidarMiPedido(resCtx.id); } catch (e) {}
       cargarDashboard();
-    } else cargarAjustesPendientes();
+    } else { Object.keys(AJ).forEach(k => delete AJ[k]); SB_CARGADO = false; cargarAjustesPendientes(); }
   });
 
   function renderTablaPendientes(p) {
@@ -1572,9 +1678,38 @@
     body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => verDetalle(b.dataset.id)));
   }
 
+  const LISTAS_ABIERTAS = new Set();   // listas desbloqueadas en esta sesión (no se guarda en el teléfono)
+  function pedirClave(titulo, detalle) {
+    return new Promise(res => {
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+      ov.innerHTML = `<div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">
+        <div style="font-size:17px;font-weight:800;color:#111827;">🔒 ${esc(titulo)}</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:6px;line-height:1.45;">${esc(detalle)}</div>
+        <input type="password" inputmode="numeric" maxlength="8" placeholder="Clave" autocomplete="off" style="width:100%;box-sizing:border-box;margin-top:14px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:11px;font-size:18px;letter-spacing:4px;font-family:monospace;"/>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button type="button" data-x style="flex:1;padding:12px;border-radius:10px;border:2px solid #e5e7eb;background:#f3f4f6;font-weight:700;font-size:14px;cursor:pointer;">Cancelar</button>
+          <button type="button" data-ok style="flex:1;padding:12px;border-radius:10px;border:none;background:#2563eb;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
+        </div></div>`;
+      document.body.appendChild(ov);
+      const inp = ov.querySelector('input'), fin = v => { ov.remove(); res(v); };
+      ov.querySelector('[data-x]').onclick = () => fin(null);
+      ov.querySelector('[data-ok]').onclick = () => fin(inp.value.trim() || null);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') fin(inp.value.trim() || null); if (e.key === 'Escape') fin(null); });
+      setTimeout(() => inp.focus(), 50);
+    });
+  }
   async function continuarLista(id) {
     const det = await apiGet('listaDetalle', { id });
     if (!det.success) return;
+    if (!LISTAS_ABIERTAS.has(id)) {
+      const pin = await pedirClave('Lista de ' + (det.lista.responsable || '—'), 'Ingresa la clave de ' + (det.lista.responsable || 'quien creó la lista') + ', o la de un autorizador.');
+      if (!pin) return;
+      const { data, error } = await sb.rpc('acceso_lista', { p_lista_id: id, p_pin: pin });
+      if (error) { alert('Error: ' + error.message + (String(error.message).includes('acceso_lista') ? '\n\nFalta correr parche_clave_listas.sql en Supabase.' : '')); return; }
+      if (!data || !data.success) { alert((data && data.message) || 'Clave incorrecta'); return; }
+      LISTAS_ABIERTAS.add(id);
+    }
     listaActualId = id;
     document.querySelector('.tab-btn[data-tab="listas"]').click();
     mostrarPanelConLista(det.lista, det.items);
@@ -1815,13 +1950,14 @@
   }
 
   function renderPicking() {
+    asegurarAjustes(PICK_ITEMS.map(i => i.sku)).then(n => { if (n) renderPicking(); });
     const listos = PICK_ITEMS.filter(i => i.pickingOk).length, tot = PICK_ITEMS.length;
     document.getElementById('pick-bar').style.width = (tot ? Math.round(listos / tot * 100) : 0) + '%';
     document.getElementById('pick-prog').textContent = listos + ' de ' + tot + ' productos listos';
     const entregado = PICK_ACTUAL.pickingEstado === 'entregado';
     document.getElementById('pick-items').innerHTML = PICK_ITEMS.map((it, i) => `<div class="pick-item${it.pickingOk ? ' ok' : ''}">
         ${fotoTag(it.sku)}
-        <div class="pi-main"><div class="pi-desc">${esc(it.descripcion || '')}</div><div class="pi-sku">${esc(it.sku)} · ${it.tipo}</div></div>
+        <div class="pi-main"><div class="pi-desc">${esc(it.descripcion || '')}</div><div class="pi-sku">${esc(it.sku)} · ${it.tipo}</div>${ajusteBadge(it.sku)}</div>
         <div class="pick-cant"><b>${it.cantidad}</b><small>Unid</small></div>
         <button class="pick-chk${it.pickingOk ? ' on' : ''}" data-pick-i="${i}" type="button" ${entregado ? 'disabled' : ''}>${it.pickingOk ? '✓' : ''}</button>
       </div>`).join('') || '<div class="empty-state">Esta lista no tiene productos.</div>';
@@ -2093,6 +2229,22 @@
     cargarSateo();
   });
   btnSatModo.addEventListener('click', () => { if (autorizadorDesbloqueado) bloquearAutorizador(); else abrirDesbloqueo(); });
+  function actualizarBotonSateo() {
+    if (!btnSatModo) return;
+    if (autorizadorDesbloqueado) { btnSatModo.textContent = '🔓 Validar: ' + sesionAutorizador.nombre + ' (bloquear)'; btnSatModo.className = 'btn small unlocked'; }
+    else { btnSatModo.textContent = '🔒 Validar: bloqueado'; btnSatModo.className = 'btn small locked'; }
+    renderSateo();
+  }
+
+  cargarCache();
+  initListas();
+  initSateo();
+  cargarSateo();
+  inputEl.focus();
+  </script>
+</body>
+</html>
+ });
   function actualizarBotonSateo() {
     if (!btnSatModo) return;
     if (autorizadorDesbloqueado) { btnSatModo.textContent = '🔓 Validar: ' + sesionAutorizador.nombre + ' (bloquear)'; btnSatModo.className = 'btn small unlocked'; }
