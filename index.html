@@ -455,10 +455,20 @@
         </div>
       </div>
 
+      <div id="tipo-modal" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:18px; padding:24px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.3); display:flex; flex-direction:column; gap:12px;">
+          <div style="font-size:18px; font-weight:800; color:var(--gris-900); text-align:center;">¿Qué vas a hacer?</div>
+          <div id="tipo-modal-sub" style="font-size:13px; color:var(--gris-500); text-align:center; margin-top:-6px;"></div>
+          <button type="button" data-tipo-elegir="ENTRADA" style="padding:18px; border-radius:14px; border:2px solid var(--verde); background:var(--verde-bg); color:var(--verde); font-family:inherit; font-size:17px; font-weight:800; cursor:pointer; display:flex; flex-direction:column; gap:4px; align-items:center;">📥 Ingresar a bodega<span style="font-size:12px; font-weight:600; color:var(--gris-700);">Productos que van de la sala a la bodega</span></button>
+          <button type="button" data-tipo-elegir="SALIDA" style="padding:18px; border-radius:14px; border:2px solid var(--rojo); background:var(--rojo-bg); color:var(--rojo); font-family:inherit; font-size:17px; font-weight:800; cursor:pointer; display:flex; flex-direction:column; gap:4px; align-items:center;">📤 Retirar de bodega<span style="font-size:12px; font-weight:600; color:var(--gris-700);">Productos que salen de bodega a la sala</span></button>
+          <button type="button" data-tipo-elegir="" style="padding:12px; border:none; background:none; color:var(--gris-500); font-family:inherit; font-size:15px; font-weight:700; cursor:pointer;">Cancelar</button>
+        </div>
+      </div>
+
       <div id="panel-con-lista" style="display:none; flex-direction:column; gap:14px;">
         <div class="card lista-header">
           <div>
-            <span class="badge pendiente">Pendiente</span>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"><span class="badge pendiente">Pendiente</span><span id="lista-tipo-badge"></span></div>
             <h2 class="card-title" id="lista-responsable-actual">—</h2>
             <p class="muted" id="lista-fecha-actual">—</p>
           </div>
@@ -481,7 +491,7 @@
             <button id="btn-buscar-sku" class="btn ghost btn-consultar" type="button">Buscar</button>
           </div>
           <p id="preview-feedback" class="feedback"></p>
-          <div class="form-row" style="margin-top:4px;">
+          <div class="form-row" id="tipo-row" style="margin-top:4px;">
             <div class="tipo-toggle">
               <button type="button" class="tipo-btn salida active" data-tipo="SALIDA">Salida</button>
               <button type="button" class="tipo-btn entrada" data-tipo="ENTRADA">Entrada</button>
@@ -830,7 +840,7 @@
           (data||[]).forEach(l => {
             const o = { id:l.id, fechaCreacion:l.fecha_creacion, responsable:l.responsable, estado:l.estado,
               fechaCierre:l.fecha_cierre, totalItems:(l.lista_items&&l.lista_items[0]&&l.lista_items[0].count)||0,
-              numeroDocumento:l.numero_documento||'', autorizadoPor:l.autorizado_por||'', pickingEstado:l.picking_estado||'' };
+              numeroDocumento:l.numero_documento||'', autorizadoPor:l.autorizado_por||'', pickingEstado:l.picking_estado||'', tipo:l.tipo||'' };
             (l.estado==='Cerrada'?cerradas:pendientes).push(o);
           });
           return { success:true, pendientes, cerradas };
@@ -843,7 +853,7 @@
             tipo:it.tipo, cantidad:it.cantidad, stock:it.stock, checkAsistente:it.check_asistente||'', checkAutorizador:it.check_autorizador||'', sateoEstado:it.sateo_estado||'', pickingOk:!!it.picking_ok, enInventario:true }));
           const lista = { id:ls.id, fechaCreacion:ls.fecha_creacion, responsable:ls.responsable, estado:ls.estado,
             fechaCierre:ls.fecha_cierre, totalItems:items.length, numeroDocumento:ls.numero_documento||'', autorizadoPor:ls.autorizado_por||'',
-            pickingEstado:ls.picking_estado||'', pickingBodeguero:ls.picking_bodeguero||'', pickingSolicitadoTs:ls.picking_solicitado_ts||'', pickingEntregadoTs:ls.picking_entregado_ts||'' };
+            pickingEstado:ls.picking_estado||'', pickingBodeguero:ls.picking_bodeguero||'', pickingSolicitadoTs:ls.picking_solicitado_ts||'', pickingEntregadoTs:ls.picking_entregado_ts||'', tipo:ls.tipo||'' };
           return { success:true, lista, items };
         }
         case 'resumenMovimientos': {
@@ -865,9 +875,9 @@
     try {
       switch (action) {
         case 'crearLista': {
-          const { data, error } = await sb.from('listas').insert({ responsable:payload.responsable, numero_documento:payload.numeroDocumento||'' }).select().single();
-          if (error) return { success:false, message:error.message };
-          return { success:true, id:data.id, fechaCreacion:data.fecha_creacion, responsable:data.responsable, numeroDocumento:data.numero_documento||'', estado:data.estado };
+          const { data, error } = await sb.from('listas').insert({ responsable:payload.responsable, numero_documento:payload.numeroDocumento||'', tipo:payload.tipo||'' }).select().single();
+          if (error) return { success:false, message:error.message + (String(error.message).includes('tipo') ? ' · Falta correr parche_tipo_lista.sql en Supabase.' : '') };
+          return { success:true, id:data.id, fechaCreacion:data.fecha_creacion, responsable:data.responsable, numeroDocumento:data.numero_documento||'', estado:data.estado, tipo:data.tipo||'' };
         }
         case 'agregarItem': {
           const { data, error } = await sb.rpc('agregar_item', { p_lista_id:payload.listaId, p_sku:payload.sku, p_tipo:payload.tipo, p_cantidad:payload.cantidad });
@@ -1276,7 +1286,11 @@
     const v = await sb.rpc('verificar_pin_responsable', { p_nombre: responsable, p_pin: pin });
     if (v.error) { btn.disabled = false; alert('Error: ' + v.error.message + (String(v.error.message).includes('verificar_pin_responsable') ? '\n\nFalta correr parche_clave_listas.sql en Supabase.' : '')); return; }
     if (!v.data || !v.data.success) { btn.disabled = false; alert((v.data && v.data.message) || 'Clave incorrecta'); pinEl.value = ''; pinEl.focus(); return; }
-    const resp = await apiPost('crearLista', { responsable, numeroDocumento });
+    btn.disabled = false;
+    const tipo = await elegirTipoLista(responsable);
+    if (!tipo) return;
+    btn.disabled = true;
+    const resp = await apiPost('crearLista', { responsable, numeroDocumento, tipo });
     btn.disabled = false;
     if (!resp.success) { alert(resp.message || 'No se pudo crear la lista'); return; }
     pinEl.value = '';
@@ -1296,11 +1310,37 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
+  function elegirTipoLista(responsable) {
+    return new Promise(res => {
+      const m = document.getElementById('tipo-modal');
+      document.getElementById('tipo-modal-sub').textContent = 'Lista de ' + (responsable || '—');
+      m.classList.remove('hidden');
+      const fin = v => { m.classList.add('hidden'); m.querySelectorAll('[data-tipo-elegir]').forEach(b => b.onclick = null); res(v); };
+      m.querySelectorAll('[data-tipo-elegir]').forEach(b => b.onclick = () => fin(b.dataset.tipoElegir));
+      m.onclick = e => { if (e.target === m) fin(''); };
+    });
+  }
+  const esIngreso = l => !!l && l.tipo === 'ENTRADA';
+  function pintarTipoLista() {
+    const t = (LISTA_ACTUAL && LISTA_ACTUAL.tipo) || '';
+    const badge = document.getElementById('lista-tipo-badge'), row = document.getElementById('tipo-row');
+    if (t) {
+      tipoSeleccionado = t;
+      row.style.display = 'none';
+      badge.innerHTML = t === 'ENTRADA'
+        ? '<span class="tipo-pill entrada" style="font-size:12px;">📥 Ingreso a bodega</span>'
+        : '<span class="tipo-pill salida" style="font-size:12px;">📤 Retiro de bodega</span>';
+    } else {   // listas antiguas sin tipo: se mantiene el selector por producto
+      row.style.display = '';
+      badge.innerHTML = '';
+    }
+  }
   function mostrarPanelConLista(lista, items) {
     document.getElementById('panel-sin-lista').style.display = 'none';
     document.getElementById('panel-con-lista').style.display = 'flex';
     document.getElementById('lista-responsable-actual').textContent = lista.responsable;
     LISTA_ACTUAL = lista;
+    pintarTipoLista();
     pintarEstadoPicking();
     document.getElementById('lista-fecha-actual').textContent =
       'Iniciada: ' + formatearFecha(lista.fechaCreacion) + (lista.numeroDocumento ? ' · Doc: ' + lista.numeroDocumento : '');
@@ -1655,7 +1695,7 @@
     const body = document.getElementById('pendientes-body'); body.innerHTML = '';
     if (!p.length) { body.innerHTML = '<tr><td colspan="4" class="muted">No hay listas pendientes</td></tr>'; return; }
     const PICK_ICO = { solicitado:['📦','Solicitada a bodega','solicitado'], preparando:['🚚','Bodega preparando','preparando'], entregado:['✅','Entregada en sala','entregado'] };
-    p.forEach(l => { const pk = PICK_ICO[l.pickingEstado]; const tr = document.createElement('tr'); tr.innerHTML = `<td>${esc(l.responsable)}${pk ? ` <span class="pick-estado ${pk[2]}" title="${pk[1]}" style="display:inline-flex; margin:0 0 0 6px; padding:2px 8px; font-size:11px; border-radius:20px; white-space:nowrap;">${pk[0]} ${pk[1]}</span>` : ''}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td style="white-space:nowrap;"><button class="btn small primary" data-id="${l.id}">Continuar</button> <button class="btn small danger-outline" data-del-lista="${l.id}" data-resp="${esc(l.responsable)}" data-n="${l.totalItems}" title="Eliminar lista (requiere autorizador)">🗑️</button></td>`; body.appendChild(tr); });
+    p.forEach(l => { const pk = PICK_ICO[l.pickingEstado]; const tr = document.createElement('tr'); tr.innerHTML = `<td>${l.tipo === 'ENTRADA' ? '📥 ' : (l.tipo === 'SALIDA' ? '📤 ' : '')}${esc(l.responsable)}${pk ? ` <span class="pick-estado ${pk[2]}" title="${pk[1]}" style="display:inline-flex; margin:0 0 0 6px; padding:2px 8px; font-size:11px; border-radius:20px; white-space:nowrap;">${pk[0]} ${pk[1]}</span>` : ''}</td><td>${formatearFecha(l.fechaCreacion)}</td><td>${l.totalItems}</td><td style="white-space:nowrap;"><button class="btn small primary" data-id="${l.id}">Continuar</button> <button class="btn small danger-outline" data-del-lista="${l.id}" data-resp="${esc(l.responsable)}" data-n="${l.totalItems}" title="Eliminar lista (requiere autorizador)">🗑️</button></td>`; body.appendChild(tr); });
     body.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => continuarLista(b.dataset.id)));
     body.querySelectorAll('[data-del-lista]').forEach(b => b.addEventListener('click', () => pedirEliminarLista(b.dataset.delLista, b.dataset.resp, +b.dataset.n)));
   }
@@ -1856,19 +1896,22 @@
      ═══════════════════════════════════════════════ */
   let LISTA_ACTUAL = null, PICK_ACTUAL = null, PICK_ITEMS = [];
   const PICK_TXT = { solicitado:'📦 Solicitada a bodega', preparando:'🚚 Bodega preparando', entregado:'✅ Entregado en sala' };
+  const PICK_TXT_IN = { solicitado:'🚚 Camino a bodega', preparando:'📥 Bodega recibiendo', entregado:'✅ Recibido en bodega' };
+  const pickTxt = (l, e) => (esIngreso(l) ? PICK_TXT_IN : PICK_TXT)[e] || '';
   const horaCorta = ts => ts ? new Date(ts).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' }) : '';
 
   function pintarEstadoPicking() {
     const el = document.getElementById('pick-estado-lista'), btn = document.getElementById('btn-solicitar-bodega');
     const e = (LISTA_ACTUAL && LISTA_ACTUAL.pickingEstado) || '';
-    if (!e) { el.classList.add('hidden'); btn.textContent = '📦 Solicitar a bodega'; btn.disabled = false; return; }
+    const ing = esIngreso(LISTA_ACTUAL);
+    if (!e) { el.classList.add('hidden'); btn.textContent = ing ? '🚚 Enviar a bodega' : '📦 Solicitar a bodega'; btn.disabled = false; return; }
     el.className = 'pick-estado ' + e;
-    let t = PICK_TXT[e] || e;
+    let t = pickTxt(LISTA_ACTUAL, e) || e;
     if (e === 'solicitado' && LISTA_ACTUAL.pickingSolicitadoTs) t += ' · ' + horaCorta(LISTA_ACTUAL.pickingSolicitadoTs);
     if (e === 'preparando' && LISTA_ACTUAL.pickingBodeguero) t += ' · ' + LISTA_ACTUAL.pickingBodeguero;
     if (e === 'entregado') t += (LISTA_ACTUAL.pickingBodeguero ? ' por ' + LISTA_ACTUAL.pickingBodeguero : '') + (LISTA_ACTUAL.pickingEntregadoTs ? ' · ' + horaCorta(LISTA_ACTUAL.pickingEntregadoTs) : '') + '. Revisa y cierra la lista.';
     el.textContent = t;
-    btn.textContent = e === 'entregado' ? '📦 Volver a pedir a bodega' : '📦 Solicitud enviada';
+    btn.textContent = e === 'entregado' ? (ing ? '🚚 Volver a enviar a bodega' : '📦 Volver a pedir a bodega') : (ing ? '🚚 Enviado a bodega' : '📦 Solicitud enviada');
     btn.disabled = e !== 'entregado';
   }
 
@@ -1876,7 +1919,9 @@
     if (!listaActualId) return;
     const salidas = itemsActuales.filter(i => i.tipo === 'SALIDA');
     if (!itemsActuales.length) { alert('Agrega productos a la lista antes de pedirla a bodega.'); return; }
-    if (!confirm('¿Enviar esta lista a bodega para que armen ' + (salidas.length || itemsActuales.length) + ' producto(s)?')) return;
+    if (!confirm(esIngreso(LISTA_ACTUAL)
+      ? '¿Enviar estos ' + itemsActuales.length + ' producto(s) a bodega para que los reciban y guarden?'
+      : '¿Enviar esta lista a bodega para que armen ' + (salidas.length || itemsActuales.length) + ' producto(s)?')) return;
     const btn = document.getElementById('btn-solicitar-bodega'); btn.disabled = true;
     const ts = new Date().toISOString();
     const { error } = await sb.from('listas').update({ picking_estado:'solicitado', picking_solicitado_ts:ts, picking_bodeguero:'', picking_entregado_ts:null }).eq('id', listaActualId);
@@ -1920,10 +1965,10 @@
       const n = (l.lista_items && l.lista_items[0] && l.lista_items[0].count) || 0;
       return `<div class="pick-card" data-pick="${l.id}">
         <div class="pc-main">
-          <div class="pc-tit">${esc(l.responsable || '—')}${l.numero_documento ? ' · Doc ' + esc(l.numero_documento) : ''}</div>
-          <div class="pc-sub">${n} producto(s) · pedida ${horaCorta(l.picking_solicitado_ts)}${l.picking_bodeguero ? ' · ' + esc(l.picking_bodeguero) : ''}</div>
+          <div class="pc-tit">${l.tipo === 'ENTRADA' ? '📥 ' : (l.tipo === 'SALIDA' ? '📤 ' : '')}${esc(l.responsable || '—')}${l.numero_documento ? ' · Doc ' + esc(l.numero_documento) : ''}</div>
+          <div class="pc-sub">${l.tipo === 'ENTRADA' ? 'Ingreso a bodega · ' : (l.tipo === 'SALIDA' ? 'Retiro de bodega · ' : '')}${n} producto(s) · ${l.tipo === 'ENTRADA' ? 'enviada' : 'pedida'} ${horaCorta(l.picking_solicitado_ts)}${l.picking_bodeguero ? ' · ' + esc(l.picking_bodeguero) : ''}</div>
         </div>
-        <span class="pick-estado ${l.picking_estado}" style="margin:0; white-space:nowrap;">${PICK_TXT[l.picking_estado] || ''}</span>
+        <span class="pick-estado ${l.picking_estado}" style="margin:0; white-space:nowrap;">${pickTxt(l, l.picking_estado)}</span>
       </div>`;
     }).join('');
     cont.querySelectorAll('[data-pick]').forEach(el => el.addEventListener('click', () => abrirPicking(el.dataset.pick)));
@@ -1934,8 +1979,8 @@
     const det = await apiGet('listaDetalle', { id });
     if (!det.success) { alert(det.message || 'No se pudo abrir'); return; }
     PICK_ACTUAL = det.lista;
-    // Lo que se saca de bodega son las SALIDAS; si la lista no tiene, se muestran todas
-    PICK_ITEMS = det.items.filter(i => i.tipo === 'SALIDA');
+    // Retiro: lo que se saca de bodega (SALIDAS). Ingreso: lo que llega a bodega (ENTRADAS).
+    PICK_ITEMS = det.items.filter(i => i.tipo === (esIngreso(det.lista) ? 'ENTRADA' : 'SALIDA'));
     if (!PICK_ITEMS.length) PICK_ITEMS = det.items;
     if (PICK_ACTUAL.pickingEstado === 'solicitado' && bod) {
       await sb.from('listas').update({ picking_estado:'preparando', picking_bodeguero:bod }).eq('id', id);
@@ -1944,7 +1989,8 @@
     document.getElementById('pick-lista-card').classList.add('hidden');
     document.getElementById('pick-detalle').classList.remove('hidden');
     document.getElementById('pick-tit').textContent = 'Lista de ' + PICK_ACTUAL.responsable;
-    document.getElementById('pick-sub').textContent = (PICK_TXT[PICK_ACTUAL.pickingEstado] || '') + (PICK_ACTUAL.numeroDocumento ? ' · Doc ' + PICK_ACTUAL.numeroDocumento : '') + (PICK_ACTUAL.pickingBodeguero ? ' · ' + PICK_ACTUAL.pickingBodeguero : '');
+    document.getElementById('pick-tit').textContent = (esIngreso(PICK_ACTUAL) ? '📥 Ingreso de ' : '📤 Retiro de ') + PICK_ACTUAL.responsable;
+    document.getElementById('pick-sub').textContent = pickTxt(PICK_ACTUAL, PICK_ACTUAL.pickingEstado) + (PICK_ACTUAL.numeroDocumento ? ' · Doc ' + PICK_ACTUAL.numeroDocumento : '') + (PICK_ACTUAL.pickingBodeguero ? ' · ' + PICK_ACTUAL.pickingBodeguero : '');
     document.getElementById('pick-fb').textContent = '';
     renderPicking();
   }
@@ -1963,7 +2009,8 @@
       </div>`).join('') || '<div class="empty-state">Esta lista no tiene productos.</div>';
     const btn = document.getElementById('pick-entregar');
     btn.disabled = entregado || !tot;
-    btn.textContent = entregado ? '✅ Ya entregado en sala' : (listos < tot ? '✅ Entregado en sala (' + listos + '/' + tot + ')' : '✅ Entregado en sala');
+    const meta = esIngreso(PICK_ACTUAL) ? 'Recibido en bodega' : 'Entregado en sala';
+    btn.textContent = entregado ? '✅ Ya ' + meta.toLowerCase() : (listos < tot ? '✅ ' + meta + ' (' + listos + '/' + tot + ')' : '✅ ' + meta);
     document.querySelectorAll('[data-pick-i]').forEach(b => b.addEventListener('click', async () => {
       const it = PICK_ITEMS[+b.dataset.pickI], nuevo = !it.pickingOk;
       it.pickingOk = nuevo; renderPicking();
@@ -1978,13 +2025,13 @@
     const bod = document.getElementById('pick-bodeguero').value || PICK_ACTUAL.pickingBodeguero;
     if (!bod) { alert('Elige quién armó el pedido (Bodeguero).'); return; }
     const faltan = PICK_ITEMS.filter(i => !i.pickingOk).length;
-    if (faltan && !confirm('Quedan ' + faltan + ' producto(s) sin marcar. ¿Avisar igual que está en sala?')) return;
+    if (faltan && !confirm('Quedan ' + faltan + ' producto(s) sin marcar. ¿Avisar igual que ' + (esIngreso(PICK_ACTUAL) ? 'se recibió en bodega' : 'está en sala') + '?')) return;
     const ts = new Date().toISOString();
     const { error } = await sb.from('listas').update({ picking_estado:'entregado', picking_bodeguero:bod, picking_entregado_ts:ts }).eq('id', PICK_ACTUAL.id);
     const fb = document.getElementById('pick-fb');
     if (error) { fb.textContent = 'No se guardó: ' + error.message; fb.className = 'feedback error'; return; }
     PICK_ACTUAL.pickingEstado = 'entregado'; PICK_ACTUAL.pickingBodeguero = bod;
-    fb.textContent = '✓ Avisado: el pedido está en sala. El responsable revisa y cierra la lista.'; fb.className = 'feedback ok';
+    fb.textContent = esIngreso(PICK_ACTUAL) ? '✓ Avisado: los productos quedaron en bodega. El responsable revisa y cierra la lista.' : '✓ Avisado: el pedido está en sala. El responsable revisa y cierra la lista.'; fb.className = 'feedback ok';
     renderPicking();
     actualizarBadgePicking();
     if (listaActualId === PICK_ACTUAL.id && LISTA_ACTUAL) { LISTA_ACTUAL = Object.assign({}, LISTA_ACTUAL, { pickingEstado:'entregado', pickingBodeguero:bod, pickingEntregadoTs:ts }); pintarEstadoPicking(); }
@@ -2244,4 +2291,3 @@
   </script>
 </body>
 </html>
- 
