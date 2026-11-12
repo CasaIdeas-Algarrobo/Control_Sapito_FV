@@ -2244,20 +2244,4 @@
   </script>
 </body>
 </html>
- });
-  function actualizarBotonSateo() {
-    if (!btnSatModo) return;
-    if (autorizadorDesbloqueado) { btnSatModo.textContent = '🔓 Validar: ' + sesionAutorizador.nombre + ' (bloquear)'; btnSatModo.className = 'btn small unlocked'; }
-    else { btnSatModo.textContent = '🔒 Validar: bloqueado'; btnSatModo.className = 'btn small locked'; }
-    renderSateo();
-  }
-
-  cargarCache();
-  initListas();
-  initSateo();
-  cargarSateo();
-  inputEl.focus();
-  </script>
-</body>
-</html>
-
+ 
