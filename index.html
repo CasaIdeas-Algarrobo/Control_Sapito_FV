@@ -455,7 +455,7 @@
         </div>
       </div>
 
-      <div id="tipo-modal" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div id="tipo-modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:18px; padding:24px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.3); display:flex; flex-direction:column; gap:12px;">
           <div style="font-size:18px; font-weight:800; color:var(--gris-900); text-align:center;">¿Qué vas a hacer?</div>
           <div id="tipo-modal-sub" style="font-size:13px; color:var(--gris-500); text-align:center; margin-top:-6px;"></div>
@@ -1314,8 +1314,8 @@
     return new Promise(res => {
       const m = document.getElementById('tipo-modal');
       document.getElementById('tipo-modal-sub').textContent = 'Lista de ' + (responsable || '—');
-      m.classList.remove('hidden');
-      const fin = v => { m.classList.add('hidden'); m.querySelectorAll('[data-tipo-elegir]').forEach(b => b.onclick = null); res(v); };
+      m.style.display = 'flex';
+      const fin = v => { m.style.display = 'none'; m.querySelectorAll('[data-tipo-elegir]').forEach(b => b.onclick = null); res(v); };
       m.querySelectorAll('[data-tipo-elegir]').forEach(b => b.onclick = () => fin(b.dataset.tipoElegir));
       m.onclick = e => { if (e.target === m) fin(''); };
     });
